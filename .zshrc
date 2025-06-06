@@ -78,7 +78,7 @@ ZSH_CUSTOM=$DOTFILES
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git)
+plugins=(colorize compleat dirpersist autojump git history cp)
 
 source $ZSH/oh-my-zsh.sh
 
@@ -114,3 +114,7 @@ alias docker=podman
 
 # Created by `pipx` on 2025-06-06 16:54:45
 export PATH="$PATH:/Users/max/.local/bin"
+export EDITOR="nvim"
+bindkey -v
+
+[ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
