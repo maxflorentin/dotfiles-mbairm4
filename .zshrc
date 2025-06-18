@@ -118,3 +118,5 @@ export EDITOR="nvim"
 bindkey -v
 
 [ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
+alias k=kubectl
+alias docker=podman
