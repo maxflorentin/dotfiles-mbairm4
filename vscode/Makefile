@@ -35,8 +35,24 @@ link:
 .PHONY: restore-extensions
 restore-extensions:
 	@echo "Installing extensions from extensions.txt..."
-	@cat "$(REPO_VSCODE_DIR)/extensions.txt" | xargs -n1 code --install-extension
-	@echo "Extensions installed."
+	@if ! command -v code >/dev/null 2>&1; then \
+		echo "VS Code CLI (code) not found in PATH."; \
+		echo "Please ensure VS Code is installed and the CLI is available."; \
+		echo "You can add it to PATH by:"; \
+		echo "  1. Opening VS Code"; \
+		echo "  2. Press Cmd+Shift+P"; \
+		echo "  3. Type 'Shell Command: Install code command in PATH'"; \
+		echo "  4. Restart your terminal"; \
+		exit 1; \
+	fi
+	@echo "Installing extensions (this may take a while)..."
+	@cat "$(REPO_VSCODE_DIR)/extensions.txt" | while read extension; do \
+		if [ -n "$$extension" ]; then \
+			echo "Installing $$extension..."; \
+			code --install-extension "$$extension" || echo "Failed to install $$extension (may already be installed)"; \
+		fi; \
+	done
+	@echo "Extensions installation complete."
 
 .PHONY: clean
 clean:
