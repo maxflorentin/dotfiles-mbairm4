@@ -35,7 +35,7 @@ link:
 .PHONY: restore-extensions
 restore-extensions:
 	@echo "Installing extensions from extensions.txt..."
-	@cat $(REPO_VSCODE_DIR)/extensions.txt | xargs -n1 code --install-extension
+	@cat "$(REPO_VSCODE_DIR)/extensions.txt" | xargs -n1 code --install-extension
 	@echo "Extensions installed."
 
 .PHONY: clean
