@@ -1,5 +1,6 @@
 {
     "redhat.telemetry.enabled": true,
     "workbench.colorTheme": "Dracula Theme",
-    "python.analysis.extraPaths": []
+    "python.analysis.extraPaths": [],
+    "git.confirmSync": false
 }
