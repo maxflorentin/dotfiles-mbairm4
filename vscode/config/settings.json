@@ -1,6 +1,12 @@
 {
-    "redhat.telemetry.enabled": true,
-    "workbench.colorTheme": "Dracula Theme",
-    "python.analysis.extraPaths": [],
-    "git.confirmSync": false
+  "redhat.telemetry.enabled": true,
+  "workbench.colorTheme": "Tokyo Night",
+  "python.analysis.extraPaths": [],
+  "git.confirmSync": false,
+  "terminal.integrated.copyOnSelection": true,
+  "editor.lineNumbers": "on",
+  "notebook.lineNumbers": "on",
+  "databricks.connectionType": "databricks-connect",
+  "databricks.workspaceFolderPath": "/Workspace/Users/maximiliano.florentin@recargapay.com",
+  "python.defaultInterpreterPath": "python"
 }
