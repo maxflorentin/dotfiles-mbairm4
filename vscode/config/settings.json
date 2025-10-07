@@ -1,6 +1,6 @@
 {
   "redhat.telemetry.enabled": true,
-  "workbench.colorTheme": "Tokyo Night",
+  "workbench.colorTheme": "Winter is Coming (Dark Blue - No Italics)",
   "python.analysis.extraPaths": [],
   "git.confirmSync": false,
   "terminal.integrated.copyOnSelection": true,
@@ -18,5 +18,9 @@
   },
   "[github-actions-workflow]": {
     "editor.defaultFormatter": "redhat.vscode-yaml"
-  }
+  },
+  "editor.fontFamily": "JetBrains, Menlo, monospace",
+  "editor.fontSize": 13,
+  "github.gitProtocol": "ssh",
+  "explorer.confirmDragAndDrop": false
 }
