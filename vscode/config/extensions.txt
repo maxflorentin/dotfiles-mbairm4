@@ -13,4 +13,5 @@ ms-toolsai.jupyter-renderers
 ms-toolsai.vscode-jupyter-cell-tags
 ms-toolsai.vscode-jupyter-slideshow
 redhat.vscode-yaml
-vscode-makefile-tools
+ms-vscode.makefile-tools
+vscodevim.vim
