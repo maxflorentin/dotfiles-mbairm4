@@ -11,8 +11,10 @@ else
 fi
 
 # Check for Oh My Zsh and install if we don't have it
-if test ! $(which omz); then
+if [ ! -d "$HOME/.oh-my-zsh" ]; then
   /bin/sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/HEAD/tools/install.sh)"
+else
+  echo "Oh My Zsh already installed."
 fi
 
 # Check for Homebrew and install if we don't have it
@@ -31,14 +33,16 @@ ln -sw $HOME/.dotfiles/.zshrc $HOME/.zshrc
 brew update
 
 # Install all our dependencies with bundle (See Brewfile)
-brew tap homebrew/bundle
 brew bundle --file ./Brewfile
 
 # Set default MySQL root password and auth type
-mysql -u root -e "ALTER USER root@localhost IDENTIFIED WITH mysql_native_password BY 'password'; FLUSH PRIVILEGES;"
 
 # Symlink the Mackup config file to the home directory
-ln -s ./.mackup.cfg $HOME/.mackup.cfg
+if [ ! -f "$HOME/.mackup.cfg" ]; then
+  ln -s ./.mackup.cfg $HOME/.mackup.cfg
+else
+  echo "Mackup config file already symlinked."
+fi
 
 # Set macOS preferences - we will run this last because this will reload the shell
 source ./.macos
