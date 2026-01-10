@@ -38,7 +38,11 @@ brew bundle --file ./Brewfile
 # Set default MySQL root password and auth type
 
 # Symlink the Mackup config file to the home directory
-ln -s ./.mackup.cfg $HOME/.mackup.cfg
+if [ ! -f "$HOME/.mackup.cfg" ]; then
+  ln -s ./.mackup.cfg $HOME/.mackup.cfg
+else
+  echo "Mackup config file already symlinked."
+fi
 
 # Set macOS preferences - we will run this last because this will reload the shell
 source ./.macos
