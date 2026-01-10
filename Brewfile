@@ -4,7 +4,6 @@ tap "stripe/stripe-cli"
 tap "stripe/stripe-mock"
 
 # Binaries (Formulas)
-brew "1password-cli"
 brew "argocd"
 brew "autojump"
 brew "awscli"
@@ -49,7 +48,6 @@ brew "svgo"
 brew "gifsicle"
 
 # Apps (Casks)
-cask "1password"
 cask "caffeine"
 cask "discord"
 cask "figma"
