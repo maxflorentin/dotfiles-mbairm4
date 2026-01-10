@@ -17,6 +17,20 @@ alias library="cd $HOME/Library"
 alias c="clear"
 alias docker="podman"
 
+# Docker/Podman compatibility aliases
+alias dps='podman ps'
+alias dimgs='podman images'
+alias drun='podman run'
+alias dbuild='podman build'
+alias dstart='podman start'
+alias dstop='podman stop'
+alias drm='podman rm'
+alias drmi='podman rmi'
+alias dexec='podman exec'
+alias dlogs='podman logs'
+alias dnet='podman network'
+alias dvol='podman volume'
+
 # Docker
 alias docker-composer="podman-compose"
 

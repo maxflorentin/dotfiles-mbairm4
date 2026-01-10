@@ -20,18 +20,23 @@ fi
 git clone $REPOSITORY $DIRECTORY
 cd $DIRECTORY
 
-touch database/database.sqlite
 
-cp .env.example .env
-sed -i '' 's/DB_DATABASE=.*/DB_DATABASE=laravel/' .env
-sed -i '' 's/DB_USERNAME=.*/DB_USERNAME=root/' .env
-sed -i '' 's/DB_PASSWORD=.*/DB_PASSWORD=/' .env
 
-composer install
-php artisan key:generate
-php artisan migrate:fresh --seed
 
-npm install
-npm run build
+# Python virtual environment setup
+if [ -f "requirements.txt" ]; then
+    echo "Setting up Python virtual environment..."
+    if command -v uv &> /dev/null; then
+        echo "Using uv for virtual environment setup."
+        uv venv
+        source .venv/bin/activate
+        uv pip install -r requirements.txt
+    else
+        echo "uv not found, falling back to python3 -m venv."
+        python3 -m venv .venv
+        source .venv/bin/activate
+        pip install -r requirements.txt
+    fi
+fi
 
 open -a "/Applications/Visual Studio Code.app" "`pwd`"
