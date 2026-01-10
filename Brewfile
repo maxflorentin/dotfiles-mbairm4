@@ -43,6 +43,7 @@ brew "svn"
 brew "task"
 brew "tree"
 brew "yarn"
+brew "terraform"
 
 # Spatie Medialibrary
 brew "jpegoptim"
@@ -82,27 +83,8 @@ cask "tuple"
 cask "visual-studio-code"
 cask "warp"
 cask "zoom"
+cask "dbeaver-community"
+cask "iterm2"
 
 # Fonts
-cask "font-lato"
-cask "font-open-sans"
-cask "font-roboto"
-cask "font-source-code-pro"
-cask "font-source-code-pro-for-powerline"
-cask "font-source-sans-pro"
-cask "font-source-serif-pro"
-
-# Mac App Store (MAS)
-mas "AdBlock", id: 1402042596
-mas "Byword", id: 420212497
-mas "EZVIZ HD", id: 1594552558
-mas "Giphy Capture", id: 668208984
-mas "GarageBand", id: 682658836
-mas "Keynote", id: 409183694
-mas "MyWoosh", id: 1498889644
-mas "Numbers", id: 409203825
-mas "Pages", id: 409201541
-mas "Speedtest", id: 1153157709
-mas "Spring", id: 1508706541
-mas "Things", id: 904280696
-mas "WhatsApp", id: 310633997
+cask "font-fira-code-nerd-font"
