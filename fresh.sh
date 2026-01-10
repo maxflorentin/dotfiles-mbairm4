@@ -11,8 +11,10 @@ else
 fi
 
 # Check for Oh My Zsh and install if we don't have it
-if test ! $(which omz); then
+if [ ! -d "$HOME/.oh-my-zsh" ]; then
   /bin/sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/HEAD/tools/install.sh)"
+else
+  echo "Oh My Zsh already installed."
 fi
 
 # Check for Homebrew and install if we don't have it
@@ -31,7 +33,6 @@ ln -sw $HOME/.dotfiles/.zshrc $HOME/.zshrc
 brew update
 
 # Install all our dependencies with bundle (See Brewfile)
-brew tap homebrew/bundle
 brew bundle --file ./Brewfile
 
 # Set default MySQL root password and auth type
