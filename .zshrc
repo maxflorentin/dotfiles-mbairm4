@@ -9,6 +9,8 @@ export ZSH="$HOME/.oh-my-zsh"
 
 
 autoload -U promptinit; promptinit
+zstyle ':prompt:pure:path' color cyan
+zstyle ':prompt:pure:virtualenv' color 242
 prompt pure
 
 # Set name of the theme to load --- if set to "random", it will
@@ -123,3 +125,36 @@ alias docker=podman
 # Added by Antigravity
 export PATH="/Users/max/.antigravity/antigravity/bin:$PATH"
 source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+export PATH="$HOME/.local/bin:$PATH"
+export DOCKER_HOST="unix:///var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/podman/podman-machine-default-api.sock"
+
+uv-up() {
+    source ~/scripts/uv_setup.sh
+}
+
+
+autoload -U add-zsh-hook
+
+auto_activate_venv() {
+    if [[ -n "$VIRTUAL_ENV" ]]; then
+        local venv_dir=$(dirname "$VIRTUAL_ENV")
+        if [[ "$PWD"/ != "$venv_dir"/* ]] && [[ "$PWD" != "$venv_dir" ]]; then
+            deactivate 2>/dev/null
+        fi
+    fi
+    
+    local dir="$PWD"
+    while [[ "$dir" != "/" ]]; do
+        if [[ -f "$dir/.venv/bin/activate" ]]; then
+            # Solo activar si no es el venv actual
+            if [[ "$VIRTUAL_ENV" != "$dir/.venv" ]]; then
+                source "$dir/.venv/bin/activate"
+            fi
+            return
+        fi
+        dir=$(dirname "$dir")
+    done
+}
+
+add-zsh-hook chpwd auto_activate_venv
+auto_activate_venv
