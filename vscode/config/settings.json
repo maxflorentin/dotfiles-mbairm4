@@ -1,6 +1,5 @@
 {
   "redhat.telemetry.enabled": true,
-  "workbench.colorTheme": "Winter is Coming (Dark Blue - No Italics)",
   "python.analysis.extraPaths": [],
   "git.confirmSync": false,
   "terminal.integrated.copyOnSelection": true,
@@ -22,5 +21,14 @@
   "editor.fontFamily": "JetBrains, Menlo, monospace",
   "editor.fontSize": 13,
   "github.gitProtocol": "ssh",
-  "explorer.confirmDragAndDrop": false
+  "explorer.confirmDragAndDrop": false,
+  "chat.instructionsFilesLocations": {
+    ".github/instructions": true,
+    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-collections-post-response.instructions.md": true,
+    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-collections-pre-request.instructions.md": true,
+    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-folder-post-response.instructions.md": true,
+    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-folder-pre-request.instructions.md": true,
+    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-http-request-post-response.instructions.md": true,
+    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-http-request-pre-request.instructions.md": true
+  }
 }
