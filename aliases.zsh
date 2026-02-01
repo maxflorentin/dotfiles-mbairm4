@@ -2,8 +2,8 @@
 alias copyssh="pbcopy < $HOME/.ssh/id_ed25519.pub"
 alias reloadshell="omz reload"
 alias reloaddns="dscacheutil -flushcache && sudo killall -HUP mDNSResponder"
-alias ll="/opt/homebrew/opt/coreutils/libexec/gnubin/ls -AhlFo --color --group-directories-first"
-alias phpstorm='open -a /Applications/PhpStorm.app "`pwd`"'
+alias ll="${COREUTILS_BIN:-/opt/homebrew/opt/coreutils/libexec/gnubin}/ls -AhlFo --color --group-directories-first"
+alias phpstorm='open -a "${PHPSTORM_APP:-/Applications/PhpStorm.app}" "`pwd`"'
 alias shrug="echo '¯\_(ツ)_/¯' | pbcopy"
 alias compile="commit 'compile'"
 alias timestamp="date +%s"
@@ -35,7 +35,7 @@ alias dvol='podman volume'
 alias docker-composer="podman-compose"
 
 # SQL Server
-alias mssql="docker run -e ACCEPT_EULA=Y -e SA_PASSWORD=LaravelWow1986! -p 1433:1433 mcr.microsoft.com/mssql/server:2017-latest"
+alias mssql="docker run -e ACCEPT_EULA=Y -e SA_PASSWORD=${MSSQL_PASSWORD:-LaravelWow1986!} -p 1433:1433 mcr.microsoft.com/mssql/server:2017-latest"
 
 # Git
 alias gs="git status"

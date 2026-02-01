@@ -1,12 +1,18 @@
 #!/bin/bash
 
+# Load environment variables
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -f "$DOTFILES_DIR/.env" ]; then
+  source "$DOTFILES_DIR/.env"
+fi
+
 echo "Setting up test project..."
 
 REPOSITORY=$1
 DIRECTORY="./$2"
 
-if [[ $PWD != "$HOME/Herd" ]]; then
-    echo "You can only setup projects in the $HOME/Herd directory."
+if [[ $PWD != "${HERD_DIR:-$HOME/Herd}" ]]; then
+    echo "You can only setup projects in the ${HERD_DIR:-$HOME/Herd} directory."
 
     exit 1
 fi
@@ -39,4 +45,4 @@ if [ -f "requirements.txt" ]; then
     fi
 fi
 
-open -a "/Applications/Visual Studio Code.app" "`pwd`"
+open -a "${VSCODE_APP:-/Applications/Visual Studio Code.app}" "`pwd`"

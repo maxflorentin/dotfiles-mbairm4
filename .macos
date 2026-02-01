@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# Load environment variables
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$DOTFILES_DIR/.env" ]; then
+  source "$DOTFILES_DIR/.env"
+fi
+
 # Thanks to Mathias Bynens!
 # ~/.macos — https://mths.be/macos
 
@@ -18,10 +24,10 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 ###############################################################################
 
 # Set computer name (as done via System Preferences → Sharing)
-sudo scutil --set ComputerName "mbp-yuno"
-sudo scutil --set HostName "mbp-yuno"
-sudo scutil --set LocalHostName "mbp-yuno"
-sudo defaults write /Library/Preferences/SystemConfiguration/com.apple.smb.server NetBIOSName -string "mbp-yuno"
+sudo scutil --set ComputerName "${MACHINE_NAME:-mbp-yuno}"
+sudo scutil --set HostName "${MACHINE_NAME:-mbp-yuno}"
+sudo scutil --set LocalHostName "${MACHINE_NAME:-mbp-yuno}"
+sudo defaults write /Library/Preferences/SystemConfiguration/com.apple.smb.server NetBIOSName -string "${MACHINE_NAME:-mbp-yuno}"
 
 # Disable the sound effects on boot
 sudo nvram SystemAudioVolume=" "

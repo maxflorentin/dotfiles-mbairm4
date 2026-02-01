@@ -9,7 +9,7 @@ add_to_path() {
 add_to_path "$DOTFILES/bin"
 
 # Load global Node installed binaries
-add_to_path "$HOME/.node/bin"
+add_to_path "${NODE_BIN:-$HOME/.node/bin}"
 add_to_path "node_modules/.bin"
 
 add_to_path "$HOME/.local/bin"
