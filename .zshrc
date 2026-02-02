@@ -67,7 +67,7 @@ export PATH="$HOME/.local/bin:$PATH"
 export DOCKER_HOST="${DOCKER_HOST:-unix:///var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/podman/podman-machine-default-api.sock}"
 
 uv-up() {
-    source "${UV_SETUP_SCRIPT:-$HOME/scripts/uv_setup.sh}"
+    source "${UV_SETUP_SCRIPT:-$HOME/Scripts/uv_setup.sh}"
 }
 
 
