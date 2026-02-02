@@ -110,3 +110,6 @@ unasp() {
   unset AWS_PROFILE
   echo "☁️  AWS_PROFILE unset."
 }
+
+export PATH="$HOME/Scripts/dotfiles:$PATH"
+alias sqlit-conn='$HOME/Scripts/dotfiles/sqlit-add-connection.sh'
