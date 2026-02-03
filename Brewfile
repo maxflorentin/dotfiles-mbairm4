@@ -1,4 +1,5 @@
 tap "minio/stable"
+tap snowflakedb/snowflake-cli
 brew "argocd"
 brew "autojump"
 brew "awscli"
@@ -52,3 +53,5 @@ vscode "anthropic.claude-code"
 vscode "github.copilot"
 vscode "github.copilot-chat"
 vscode "postman.postman-for-vscode"
+brew "snowflake-cli"
+brew "direnv"

@@ -2,9 +2,10 @@
 export DOTFILES=$HOME/.dotfiles
 
 # Load environment variables if .env exists
-if [ -f "$DOTFILES/.env" ]; then
-  source "$DOTFILES/.env"
-fi
+# Disabled in favor of direnv - see .envrc
+# if [ -f "$DOTFILES/.env" ]; then
+#   source "$DOTFILES/.env"
+# fi
 
 # Path to your oh-my-zsh installation.
 export ZSH="${OH_MY_ZSH:-$HOME/.oh-my-zsh}"
@@ -25,6 +26,9 @@ ZSH_CUSTOM=$DOTFILES
 plugins=(colorize compleat dirpersist autojump git history cp)
 
 source $ZSH/oh-my-zsh.sh
+
+# direnv hook
+eval "$(direnv hook zsh)"
 
 export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
@@ -48,8 +52,8 @@ export LANG=en_US.UTF-8
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 alias vim=nvim
-
 alias docker=podman
+alias docker-compose='podman compose'
 
 # Created by `pipx` on 2025-06-06 16:54:45
 export PATH="$PATH:${LOCAL_BIN:-$HOME/.local/bin}"
@@ -58,7 +62,6 @@ bindkey -v
 
 [ -f "${AUTOJUMP_PROFILE:-/opt/homebrew/etc/profile.d/autojump.sh}" ] && . "${AUTOJUMP_PROFILE:-/opt/homebrew/etc/profile.d/autojump.sh}"
 alias k=kubectl
-alias docker=podman
 
 # Added by Antigravity
 export PATH="${ANTIGRAVITY_BIN:-$HOME/.antigravity/antigravity/bin}:$PATH"
@@ -113,3 +116,6 @@ unasp() {
 
 export PATH="$HOME/Scripts/dotfiles:$PATH"
 alias sqlit-conn='$HOME/Scripts/dotfiles/sqlit-add-connection.sh'
+
+# Add local bin to PATH for custom scripts
+export PATH="$HOME/.local/bin:$PATH"
