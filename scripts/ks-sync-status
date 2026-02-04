@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# ks-sync-status: Show sync status of all keychains
+# Usage: ks-sync-status
+
+KEYCHAIN_DIR="${HOME}/Library/Keychains"
+ICLOUD_DIR="${HOME}/Library/Mobile Documents/com~apple~CloudDocs/keychains"
+
+echo "Keychain Sync Status"
+echo "===================="
+echo ""
+
+# Check if iCloud directory exists
+if [ ! -d "${ICLOUD_DIR}" ]; then
+    echo "⚠ iCloud keychains directory not found"
+    echo "  Location: ${ICLOUD_DIR}"
+    echo ""
+    echo "Run 'ks-sync-enable <context>' to enable sync"
+    exit 0
+fi
+
+# Find all ks keychains
+found_local=0
+found_icloud=0
+
+echo "Local Keychains:"
+for keychain in "${KEYCHAIN_DIR}"/ks-*.keychain*; do
+    if [ -e "$keychain" ]; then
+        found_local=1
+        basename=$(basename "$keychain")
+        context=$(echo "$basename" | sed 's/ks-//' | sed 's/.keychain.*//')
+
+        if [ -L "$keychain" ]; then
+            target=$(readlink "$keychain")
+            if [[ "$target" == *"com~apple~CloudDocs"* ]]; then
+                echo "  ✓ ${context} (synced to iCloud)"
+            else
+                echo "  ⚠ ${context} (symlink, but not to iCloud)"
+            fi
+        else
+            echo "  ○ ${context} (local only)"
+        fi
+    fi
+done
+
+if [ $found_local -eq 0 ]; then
+    echo "  None found"
+fi
+
+echo ""
+echo "iCloud Keychains:"
+for keychain in "${ICLOUD_DIR}"/ks-*.keychain*; do
+    if [ -e "$keychain" ]; then
+        found_icloud=1
+        basename=$(basename "$keychain")
+        context=$(echo "$basename" | sed 's/ks-//' | sed 's/.keychain.*//')
+
+        # Check if linked locally
+        if [ -L "${KEYCHAIN_DIR}/${basename}" ]; then
+            echo "  ✓ ${context} (linked locally)"
+        else
+            echo "  ○ ${context} (not linked on this device)"
+            echo "    Run: ks-sync-link ${context}"
+        fi
+    fi
+done
+
+if [ $found_icloud -eq 0 ]; then
+    echo "  None found"
+    echo ""
+    echo "To enable iCloud sync:"
+    echo "  ks-sync-enable <context-name>"
+fi
+
+echo ""
+echo "Commands:"
+echo "  ks-sync-enable <context>  - Enable iCloud sync"
+echo "  ks-sync-link <context>    - Link to iCloud keychain on new device"

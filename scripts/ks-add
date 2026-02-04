@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# ks-add: Add a secret to the current context
+# Usage: ks-add <key> [value]
+# If value is not provided, it will be read from stdin (hidden)
+
+if [ -z "$1" ]; then
+    echo "Error: Key name required"
+    echo "Usage: ks-add <key> [value]"
+    echo "Example: ks-add api-key 'your-secret-value'"
+    echo "Or: ks-add api-key  (will prompt for value)"
+    exit 1
+fi
+
+KEY="$1"
+VALUE="$2"
+
+# Check if ks is installed
+if ! command -v ks &> /dev/null; then
+    echo "Error: ks is not installed"
+    echo "Install with: brew install ks"
+    exit 1
+fi
+
+# Get current context
+KS_CONFIG_DIR="${HOME}/.config/ks"
+KS_CONTEXT_FILE="${KS_CONFIG_DIR}/current-context"
+
+# Determine which keychain to use
+if [ -n "${KS_DEFAULT_KEYCHAIN}" ]; then
+    CONTEXT="${KS_DEFAULT_KEYCHAIN}"
+elif [ -f "${KS_CONTEXT_FILE}" ]; then
+    CONTEXT=$(cat "${KS_CONTEXT_FILE}")
+else
+    echo "Error: No context set"
+    echo "Run: ks-set-context <context-name>"
+    exit 1
+fi
+
+echo "Adding secret to context: ${CONTEXT}"
+
+# Add the secret
+if [ -z "$VALUE" ]; then
+    ks -k "${CONTEXT}" add "${KEY}"
+else
+    ks -k "${CONTEXT}" add "${KEY}" "${VALUE}"
+fi
+
+if [ $? -eq 0 ]; then
+    echo "✓ Secret '${KEY}' added to '${CONTEXT}'"
+else
+    echo "✗ Failed to add secret"
+    exit 1
+fi

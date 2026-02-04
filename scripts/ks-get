@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# ks-get: Get a secret from the current context
+# Usage: ks-get <key>
+
+if [ -z "$1" ]; then
+    echo "Error: Key name required"
+    echo "Usage: ks-get <key>"
+    echo "Example: ks-get api-key"
+    exit 1
+fi
+
+KEY="$1"
+
+# Check if ks is installed
+if ! command -v ks &> /dev/null; then
+    echo "Error: ks is not installed"
+    echo "Install with: brew install ks"
+    exit 1
+fi
+
+# Get current context
+KS_CONFIG_DIR="${HOME}/.config/ks"
+KS_CONTEXT_FILE="${KS_CONFIG_DIR}/current-context"
+
+# Determine which keychain to use
+if [ -n "${KS_DEFAULT_KEYCHAIN}" ]; then
+    CONTEXT="${KS_DEFAULT_KEYCHAIN}"
+elif [ -f "${KS_CONTEXT_FILE}" ]; then
+    CONTEXT=$(cat "${KS_CONTEXT_FILE}")
+else
+    echo "Error: No context set" >&2
+    echo "Run: ks-set-context <context-name>" >&2
+    exit 1
+fi
+
+# Get the secret (output only the value, errors go to stderr)
+ks -k "${CONTEXT}" get "${KEY}"

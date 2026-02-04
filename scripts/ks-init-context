@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# ks-init-context: Initialize a new keychain for a context
+# Usage: ks-init-context <context-name>
+# Example: ks-init-context j1
+
+if [ -z "$1" ]; then
+    echo "Error: Context name required"
+    echo "Usage: ks-init-context <context-name>"
+    echo "Examples: j1, j2, j3, personal"
+    exit 1
+fi
+
+CONTEXT="$1"
+
+# Check if ks is installed
+if ! command -v ks &> /dev/null; then
+    echo "Error: ks is not installed"
+    echo "Install with: brew install ks"
+    exit 1
+fi
+
+# Initialize the keychain
+echo "Initializing keychain for context: ${CONTEXT}"
+ks -k "${CONTEXT}" init
+
+if [ $? -eq 0 ]; then
+    echo "✓ Keychain '${CONTEXT}' initialized successfully"
+    echo ""
+    echo "To use this context, run:"
+    echo "  ks-set-context ${CONTEXT}"
+else
+    echo "✗ Failed to initialize keychain '${CONTEXT}'"
+    exit 1
+fi

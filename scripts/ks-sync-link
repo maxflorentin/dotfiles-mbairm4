@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# ks-sync-link: Link to an existing iCloud-synced keychain on a new device
+# Usage: ks-sync-link <context-name>
+
+if [ -z "$1" ]; then
+    echo "Error: Context name required"
+    echo "Usage: ks-sync-link <context-name>"
+    echo "Example: ks-sync-link j1"
+    exit 1
+fi
+
+CONTEXT="$1"
+KEYCHAIN_DIR="${HOME}/Library/Keychains"
+ICLOUD_DIR="${HOME}/Library/Mobile Documents/com~apple~CloudDocs/keychains"
+KEYCHAIN_FILE="ks-${CONTEXT}.keychain"
+
+# Check if keychain exists in iCloud
+if [ ! -e "${ICLOUD_DIR}/${KEYCHAIN_FILE}" ]; then
+    echo "Error: Keychain '${CONTEXT}' not found in iCloud"
+    echo ""
+    echo "Make sure:"
+    echo "1. You ran 'ks-sync-enable ${CONTEXT}' on the primary device"
+    echo "2. iCloud Drive is syncing properly"
+    echo "3. The file has finished uploading"
+    echo ""
+    echo "Expected location: ${ICLOUD_DIR}/${KEYCHAIN_FILE}"
+    exit 1
+fi
+
+# Check if local keychain already exists
+if [ -e "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}" ]; then
+    if [ -L "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}" ]; then
+        LINK_TARGET=$(readlink "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}")
+        if [ "${LINK_TARGET}" = "${ICLOUD_DIR}/${KEYCHAIN_FILE}" ]; then
+            echo "✓ Keychain '${CONTEXT}' is already linked to iCloud"
+            exit 0
+        else
+            echo "Warning: Local keychain exists and points to: ${LINK_TARGET}"
+            echo "Removing and re-linking to iCloud..."
+            rm "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}"
+        fi
+    else
+        echo "Warning: Local keychain exists (not a symlink)"
+        echo "Backing up to: ${KEYCHAIN_DIR}/${KEYCHAIN_FILE}.local-backup"
+        mv "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}" "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}.local-backup"
+    fi
+fi
+
+# Create symlink
+echo "Linking to iCloud keychain..."
+ln -sf "${ICLOUD_DIR}/${KEYCHAIN_FILE}" "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}"
+
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "✓ Successfully linked keychain '${CONTEXT}' from iCloud"
+    echo ""
+    echo "You can now use: ksc ${CONTEXT}"
+else
+    echo "✗ Failed to create symlink"
+    exit 1
+fi

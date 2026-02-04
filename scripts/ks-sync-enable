@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# ks-sync-enable: Enable iCloud sync for a keychain context
+# Usage: ks-sync-enable <context-name>
+
+if [ -z "$1" ]; then
+    echo "Error: Context name required"
+    echo "Usage: ks-sync-enable <context-name>"
+    echo "Example: ks-sync-enable j1"
+    exit 1
+fi
+
+CONTEXT="$1"
+KEYCHAIN_DIR="${HOME}/Library/Keychains"
+ICLOUD_DIR="${HOME}/Library/Mobile Documents/com~apple~CloudDocs/keychains"
+KEYCHAIN_FILE="ks-${CONTEXT}.keychain"
+
+# Check if keychain exists
+if [ ! -e "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}" ] && [ ! -L "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}" ]; then
+    echo "Error: Keychain '${CONTEXT}' does not exist"
+    echo "Initialize it first with: ks-init-context ${CONTEXT}"
+    exit 1
+fi
+
+# Create iCloud keychains directory if it doesn't exist
+echo "Setting up iCloud sync directory..."
+mkdir -p "${ICLOUD_DIR}"
+
+# Check if already a symlink
+if [ -L "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}" ]; then
+    LINK_TARGET=$(readlink "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}")
+    if [[ "$LINK_TARGET" == *"com~apple~CloudDocs"* ]]; then
+        echo "✓ Keychain '${CONTEXT}' is already synced to iCloud"
+        echo "  Location: ${LINK_TARGET}"
+        exit 0
+    else
+        echo "Warning: Keychain is a symlink but not pointing to iCloud"
+        echo "  Current: ${LINK_TARGET}"
+        echo "  Will update to iCloud location"
+    fi
+fi
+
+# Move keychain to iCloud
+if [ -f "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}" ]; then
+    echo "Moving keychain to iCloud..."
+    mv "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}" "${ICLOUD_DIR}/${KEYCHAIN_FILE}"
+
+    if [ $? -ne 0 ]; then
+        echo "✗ Failed to move keychain to iCloud"
+        exit 1
+    fi
+fi
+
+# Create symlink
+echo "Creating symlink..."
+ln -sf "${ICLOUD_DIR}/${KEYCHAIN_FILE}" "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}"
+
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "✓ Keychain '${CONTEXT}' is now synced to iCloud"
+    echo ""
+    echo "Next steps:"
+    echo "1. Wait for iCloud to sync the file"
+    echo "2. On other devices, run: ks-sync-link ${CONTEXT}"
+    echo ""
+    echo "Location: ${ICLOUD_DIR}/${KEYCHAIN_FILE}"
+else
+    echo "✗ Failed to create symlink"
+    # Restore original file
+    mv "${ICLOUD_DIR}/${KEYCHAIN_FILE}" "${KEYCHAIN_DIR}/${KEYCHAIN_FILE}"
+    exit 1
+fi

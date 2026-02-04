@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# ks-contexts: List all available keychain contexts
+# Usage: ks-contexts
+
+KS_CONFIG_DIR="${HOME}/.config/ks"
+KS_CONTEXT_FILE="${KS_CONFIG_DIR}/current-context"
+KEYCHAIN_DIR="${HOME}/Library/Keychains"
+
+echo "Available KS Contexts:"
+echo ""
+
+# Find all ks-*.keychain files
+found=0
+current=""
+
+if [ -f "${KS_CONTEXT_FILE}" ]; then
+    current=$(cat "${KS_CONTEXT_FILE}")
+fi
+
+# Look for keychains in the Keychains directory
+if [ -d "${KEYCHAIN_DIR}" ]; then
+    for keychain in "${KEYCHAIN_DIR}"/ks-*.keychain*; do
+        if [ -e "$keychain" ]; then
+            found=1
+            # Extract context name from filename
+            basename=$(basename "$keychain")
+            context=$(echo "$basename" | sed 's/ks-//' | sed 's/.keychain.*//')
+
+            # Mark current context
+            if [ "$context" = "$current" ]; then
+                echo "  ✓ $context (current)"
+            else
+                echo "    $context"
+            fi
+        fi
+    done
+fi
+
+if [ $found -eq 0 ]; then
+    echo "  No contexts found"
+    echo ""
+    echo "Create a new context with: ks-init-context <name>"
+fi
+
+echo ""
+if [ -n "$current" ]; then
+    echo "Current context: $current"
+else
+    echo "No context set. Use: ks-set-context <name>"
+fi

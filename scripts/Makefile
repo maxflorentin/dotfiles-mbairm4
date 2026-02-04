@@ -81,3 +81,115 @@ jira-help:
 	@echo "Examples:"
 	@echo "  make jira-merge TEMPLATE=jira_ticket_template.json MD=my_desc.md OUTPUT=final.json"
 	@echo "  make jira-create FILE=final.json"
+
+# KS Context Management
+.PHONY: ks-init
+ks-init:
+	@if [ -z "$(CONTEXT)" ]; then \
+		echo "Usage: make ks-init CONTEXT=<name>"; \
+		echo "Examples: make ks-init CONTEXT=j1"; \
+		exit 1; \
+	fi
+	@$(REPO_SCRIPTS_DIR)/ks-init-context $(CONTEXT)
+
+.PHONY: ks-set
+ks-set:
+	@if [ -z "$(CONTEXT)" ]; then \
+		echo "Usage: make ks-set CONTEXT=<name>"; \
+		echo "Examples: make ks-set CONTEXT=j1"; \
+		exit 1; \
+	fi
+	@$(REPO_SCRIPTS_DIR)/ks-set-context $(CONTEXT)
+
+.PHONY: ks-context
+ks-context:
+	@$(REPO_SCRIPTS_DIR)/ks-get-context
+
+.PHONY: ks-add
+ks-add:
+	@if [ -z "$(KEY)" ]; then \
+		echo "Usage: make ks-add KEY=<key> [VALUE=<value>]"; \
+		echo "Examples: make ks-add KEY=api-key VALUE='abc123'"; \
+		exit 1; \
+	fi
+	@if [ -n "$(VALUE)" ]; then \
+		$(REPO_SCRIPTS_DIR)/ks-add $(KEY) $(VALUE); \
+	else \
+		$(REPO_SCRIPTS_DIR)/ks-add $(KEY); \
+	fi
+
+.PHONY: ks-get
+ks-get:
+	@if [ -z "$(KEY)" ]; then \
+		echo "Usage: make ks-get KEY=<key>"; \
+		echo "Examples: make ks-get KEY=api-key"; \
+		exit 1; \
+	fi
+	@$(REPO_SCRIPTS_DIR)/ks-get $(KEY)
+
+.PHONY: ks-list
+ks-list:
+	@$(REPO_SCRIPTS_DIR)/ks-list
+
+.PHONY: ks-sync-status
+ks-sync-status:
+	@$(REPO_SCRIPTS_DIR)/ks-sync-status
+
+.PHONY: ks-sync-enable
+ks-sync-enable:
+	@if [ -z "$(CONTEXT)" ]; then \
+		echo "Usage: make ks-sync-enable CONTEXT=<name>"; \
+		echo "Examples: make ks-sync-enable CONTEXT=j1"; \
+		exit 1; \
+	fi
+	@$(REPO_SCRIPTS_DIR)/ks-sync-enable $(CONTEXT)
+
+.PHONY: ks-sync-link
+ks-sync-link:
+	@if [ -z "$(CONTEXT)" ]; then \
+		echo "Usage: make ks-sync-link CONTEXT=<name>"; \
+		echo "Examples: make ks-sync-link CONTEXT=j1"; \
+		exit 1; \
+	fi
+	@$(REPO_SCRIPTS_DIR)/ks-sync-link $(CONTEXT)
+
+.PHONY: ks-help
+ks-help:
+	@echo "KS Context Management Commands:"
+	@echo "  make ks-init CONTEXT=<name>           - Initialize new keychain context"
+	@echo "  make ks-set CONTEXT=<name>            - Set active context"
+	@echo "  make ks-context                       - Show current context"
+	@echo "  make ks-add KEY=<key> [VALUE=<val>]   - Add secret to current context"
+	@echo "  make ks-get KEY=<key>                 - Get secret from current context"
+	@echo "  make ks-list                          - List all secrets in current context"
+	@echo ""
+	@echo "iCloud Sync Commands:"
+	@echo "  make ks-sync-status                   - Show sync status of all keychains"
+	@echo "  make ks-sync-enable CONTEXT=<name>    - Enable iCloud sync (first device)"
+	@echo "  make ks-sync-link CONTEXT=<name>      - Link to iCloud keychain (other devices)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make ks-init CONTEXT=j1"
+	@echo "  make ks-set CONTEXT=j1"
+	@echo "  make ks-add KEY=JIRA_TOKEN VALUE='mytoken'"
+	@echo "  make ks-sync-enable CONTEXT=j1"
+	@echo "  make ks-sync-status"
+	@echo ""
+	@echo "Documentation:"
+	@echo "  README_KS.md       - Complete documentation"
+	@echo "  README_KS_SYNC.md  - iCloud sync guide"
+	@echo "  KS_QUICKSTART.md   - Quick start guide"
+
+.PHONY: help
+help:
+	@echo "Available Commands:"
+	@echo ""
+	@echo "Setup:"
+	@echo "  make link          - Create symlinks for scripts"
+	@echo "  make clean         - Remove symlinks and restore backup"
+	@echo ""
+	@echo "Jira Automation:"
+	@echo "  make jira-help     - Show Jira commands"
+	@echo ""
+	@echo "KS Context Management:"
+	@echo "  make ks-help       - Show KS commands"
