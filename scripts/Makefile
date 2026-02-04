@@ -29,13 +29,55 @@ link:
 .PHONY: clean
 clean:
 	@echo "Removing Scripts symlink..."
-	# Remove the symbolic link itself
 	@rm -f $(SCRIPTS_DIR)
 	@echo "Restoring backup if it exists..."
-	# Check if a backup directory exists and restore it
 	@if [ -d "$(HOME)/Scripts/dotfiles.bak" ]; then \
 		mv $(HOME)/Scripts/dotfiles.bak $(SCRIPTS_DIR); \
 		echo "Scripts restored from backup."; \
 	else \
 		echo "No Scripts backup found to restore."; \
 	fi
+
+.PHONY: jira-fields
+jira-fields:
+	@$(REPO_SCRIPTS_DIR)/jira_get_fields.py
+
+.PHONY: jira-create
+jira-create:
+	@if [ -z "$(FILE)" ]; then \
+		echo "Usage: make jira-create FILE=ticket.json"; \
+		exit 1; \
+	fi
+	@$(REPO_SCRIPTS_DIR)/jira_create_ticket.py $(FILE)
+
+.PHONY: md-to-adf
+md-to-adf:
+	@if [ -z "$(FILE)" ]; then \
+		echo "Usage: make md-to-adf FILE=description.md"; \
+		exit 1; \
+	fi
+	@$(REPO_SCRIPTS_DIR)/markdown_to_jira_adf.py $(FILE)
+
+.PHONY: jira-merge
+jira-merge:
+	@if [ -z "$(TEMPLATE)" ] || [ -z "$(MD)" ]; then \
+		echo "Usage: make jira-merge TEMPLATE=template.json MD=desc.md [OUTPUT=ticket.json]"; \
+		exit 1; \
+	fi
+	@if [ -n "$(OUTPUT)" ]; then \
+		$(REPO_SCRIPTS_DIR)/jira_merge_json.py -t $(TEMPLATE) -m $(MD) -o $(OUTPUT); \
+	else \
+		$(REPO_SCRIPTS_DIR)/jira_merge_json.py -t $(TEMPLATE) -m $(MD); \
+	fi
+
+.PHONY: jira-help
+jira-help:
+	@echo "Jira Automation Commands:"
+	@echo "  make jira-fields                           - Get all available Jira fields"
+	@echo "  make jira-create FILE=ticket.json          - Create ticket from JSON"
+	@echo "  make md-to-adf FILE=desc.md                - Convert markdown to ADF"
+	@echo "  make jira-merge TEMPLATE=t.json MD=d.md    - Merge markdown into template"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make jira-merge TEMPLATE=jira_ticket_template.json MD=my_desc.md OUTPUT=final.json"
+	@echo "  make jira-create FILE=final.json"

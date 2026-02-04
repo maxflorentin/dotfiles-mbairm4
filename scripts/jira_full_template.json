@@ -1,0 +1,147 @@
+{
+  "fields": {
+    "project": {
+      "key": "ANA"
+    },
+    "summary": "Complete ticket title - Brief and descriptive",
+    "description": {
+      "type": "doc",
+      "version": 1,
+      "content": [
+        {
+          "type": "heading",
+          "attrs": {"level": 2},
+          "content": [{"type": "text", "text": "Overview"}]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {"type": "text", "text": "Detailed description with "},
+            {"type": "text", "text": "bold", "marks": [{"type": "strong"}]},
+            {"type": "text", "text": ", "},
+            {"type": "text", "text": "italic", "marks": [{"type": "em"}]},
+            {"type": "text", "text": ", and "},
+            {"type": "text", "text": "inline code", "marks": [{"type": "code"}]},
+            {"type": "text", "text": "."}
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {"level": 3},
+          "content": [{"type": "text", "text": "Requirements"}]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Requirement 1"}]}]
+            },
+            {
+              "type": "listItem",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Requirement 2"}]}]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {"level": 3},
+          "content": [{"type": "text", "text": "Technical Details"}]
+        },
+        {
+          "type": "orderedList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Step 1"}]}]
+            },
+            {
+              "type": "listItem",
+              "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Step 2"}]}]
+            }
+          ]
+        },
+        {
+          "type": "codeBlock",
+          "attrs": {"language": "bash"},
+          "content": [{"type": "text", "text": "kubectl get pods -n production\nkubectl logs pod-name"}]
+        },
+        {
+          "type": "panel",
+          "attrs": {"panelType": "info"},
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{"type": "text", "text": "Info panel: Important note or context"}]
+            }
+          ]
+        }
+      ]
+    },
+    "issuetype": {
+      "name": "Task"
+    },
+    "priority": {
+      "name": "Medium"
+    },
+    "labels": [
+      "infrastructure",
+      "permissions",
+      "automation",
+      "starrocks"
+    ],
+    "components": [
+      {"name": "Backend"},
+      {"name": "Infrastructure"}
+    ],
+    "assignee": {
+      "accountId": null
+    },
+    "reporter": {
+      "accountId": null
+    },
+    "duedate": "2024-12-31",
+    "parent": {
+      "key": null
+    },
+    "fixVersions": [
+      {"name": "v2.1.0"}
+    ],
+    "versions": [
+      {"name": "v2.0.0"}
+    ],
+    "environment": {
+      "type": "doc",
+      "version": 1,
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [{"type": "text", "text": "DEV, Staging, Production"}]
+        }
+      ]
+    },
+    "customfield_12041": "All Customers",
+    "customfield_10000": null,
+    "customfield_10001": null,
+    "customfield_10002": null
+  },
+  "update": {
+    "worklog": [
+      {
+        "add": {
+          "timeSpent": "1h 30m",
+          "comment": {
+            "type": "doc",
+            "version": 1,
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [{"type": "text", "text": "Initial investigation"}]
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
