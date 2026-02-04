@@ -119,3 +119,7 @@ alias sqlit-conn='$HOME/Scripts/dotfiles/sqlit-add-connection.sh'
 
 # Add local bin to PATH for custom scripts
 export PATH="$HOME/.local/bin:$PATH"
+source ~/Scripts/dotfiles/ALIASES.sh
+
+# Added by Antigravity
+export PATH="/Users/maximilianoflorentin/.antigravity/antigravity/bin:$PATH"
