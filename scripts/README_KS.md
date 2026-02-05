@@ -227,6 +227,30 @@ make ks-list
 make ks-help
 ```
 
+## Casos de Uso Avanzados
+
+### Almacenar múltiples líneas (ej: Recovery Codes)
+
+`ks` puede almacenar cadenas con saltos de línea sin problemas. Esto es ideal para los recovery codes de GitHub.
+
+#### Opción 1: Desde un archivo (Recomendado)
+Si tienes tus códigos en un archivo `codes.txt`:
+```bash
+ksa -f codes.txt github-recovery
+```
+
+#### Opción 2: Interactiva (Pegar bloque)
+Si ejecutas `ksa` sin el valor:
+```bash
+ksa github-recovery
+```
+Te pedirá el valor. Puedes pegar el bloque completo de códigos y presionar `Enter` (si el script maneja stdin correctamente) o usar el comando anterior para mayor seguridad.
+
+### Recuperar códigos
+```bash
+ksget github-recovery
+```
+
 ## Tips
 
 1. **Auto-carga del contexto**: El contexto se carga automáticamente al abrir un nuevo terminal

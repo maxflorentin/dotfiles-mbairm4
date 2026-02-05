@@ -1,25 +1,56 @@
 #!/bin/bash
 
 # ks-add: Add a secret to the current context
-# Usage: ks-add <key> [value]
-# If value is not provided, it will be read from stdin (hidden)
-
-if [ -z "$1" ]; then
-    echo "Error: Key name required"
-    echo "Usage: ks-add <key> [value]"
-    echo "Example: ks-add api-key 'your-secret-value'"
-    echo "Or: ks-add api-key  (will prompt for value)"
-    exit 1
-fi
-
-KEY="$1"
-VALUE="$2"
+# Usage: ks-add [options] <key> [value]
+# Options:
+#   -f <file>    Read value from file
 
 # Check if ks is installed
 if ! command -v ks &> /dev/null; then
     echo "Error: ks is not installed"
     echo "Install with: brew install ks"
     exit 1
+fi
+
+# Parse arguments
+KEY=""
+VALUE=""
+FILE_PATH=""
+ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -f)
+            FILE_PATH="$2"
+            shift 2
+            ;;
+        *)
+            ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+if [ -n "$FILE_PATH" ]; then
+    if [ ${#ARGS[@]} -lt 1 ]; then
+        echo "Error: Key name required"
+        echo "Usage: ks-add -f <file> <key>"
+        exit 1
+    fi
+    KEY="${ARGS[0]}"
+    if [ ! -f "$FILE_PATH" ]; then
+        echo "Error: File not found: $FILE_PATH"
+        exit 1
+    fi
+    VALUE=$(cat "$FILE_PATH")
+else
+    if [ ${#ARGS[@]} -lt 1 ]; then
+        echo "Error: Key name required"
+        echo "Usage: ks-add <key> [value]"
+        exit 1
+    fi
+    KEY="${ARGS[0]}"
+    VALUE="${ARGS[1]}"
 fi
 
 # Get current context
@@ -39,16 +70,41 @@ fi
 
 echo "Adding secret to context: ${CONTEXT}"
 
-# Add the secret
-if [ -z "$VALUE" ]; then
-    ks -k "${CONTEXT}" add "${KEY}"
-else
-    ks -k "${CONTEXT}" add "${KEY}" "${VALUE}"
-fi
+# Function to add the secret
+add_secret() {
+    if [ -z "$VALUE" ]; then
+        ks -k "${CONTEXT}" add "${KEY}"
+    else
+        ks -k "${CONTEXT}" add "${KEY}" "${VALUE}"
+    fi
+}
 
-if [ $? -eq 0 ]; then
+# Try to add the secret
+OUTPUT=$(add_secret 2>&1)
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -eq 0 ]; then
     echo "✓ Secret '${KEY}' added to '${CONTEXT}'"
 else
-    echo "✗ Failed to add secret"
+    if [[ "$OUTPUT" == *"already exists"* ]]; then
+        echo "! Secret '${KEY}' already exists."
+        read -p "Do you want to overwrite it? (y/N): " CONFIRM
+        if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+            echo "Overwriting..."
+            ks -k "${CONTEXT}" rm "${KEY}" > /dev/null 2>&1
+            add_secret > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+                echo "✓ Secret '${KEY}' updated in '${CONTEXT}'"
+                exit 0
+            else
+                echo "✗ Failed to update secret"
+                exit 1
+            fi
+        else
+            echo "Aborted."
+            exit 0
+        fi
+    fi
+    echo "✗ Failed to add secret: $OUTPUT"
     exit 1
 fi

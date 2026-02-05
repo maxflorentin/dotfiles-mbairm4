@@ -35,4 +35,4 @@ else
 fi
 
 # Get the secret (output only the value, errors go to stderr)
-ks -k "${CONTEXT}" get "${KEY}"
+ks -k "${CONTEXT}" show "${KEY}"

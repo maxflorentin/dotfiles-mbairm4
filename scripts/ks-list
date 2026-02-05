@@ -27,4 +27,4 @@ fi
 
 echo "Secrets in context: ${CONTEXT}"
 echo ""
-ks -k "${CONTEXT}" list
+ks -k "${CONTEXT}" ls
