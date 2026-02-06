@@ -1,34 +1,15 @@
 {
-  "redhat.telemetry.enabled": true,
-  "python.analysis.extraPaths": [],
-  "git.confirmSync": false,
-  "terminal.integrated.copyOnSelection": true,
-  "editor.lineNumbers": "on",
-  "notebook.lineNumbers": "on",
-  "databricks.connectionType": "databricks-connect",
-  "databricks.workspaceFolderPath": "/Workspace/Users/maximiliano.florentin@recargapay.com",
-  "python.defaultInterpreterPath": "python",
-  "github.copilot.nextEditSuggestions.enabled": true,
-  "[dockercompose]": {
-    "editor.insertSpaces": true,
-    "editor.tabSize": 2,
-    "editor.autoIndent": "advanced",
-    "editor.defaultFormatter": "redhat.vscode-yaml"
-  },
-  "[github-actions-workflow]": {
-    "editor.defaultFormatter": "redhat.vscode-yaml"
-  },
-  "editor.fontFamily": "JetBrains, Menlo, monospace",
-  "editor.fontSize": 13,
-  "github.gitProtocol": "ssh",
-  "explorer.confirmDragAndDrop": false,
-  "chat.instructionsFilesLocations": {
-    ".github/instructions": true,
-    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-collections-post-response.instructions.md": true,
-    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-collections-pre-request.instructions.md": true,
-    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-folder-post-response.instructions.md": true,
-    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-folder-pre-request.instructions.md": true,
-    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-http-request-post-response.instructions.md": true,
-    "/var/folders/c5/t8d_gq6s553_s5msp76hcc600000gn/T/postman-http-request-pre-request.instructions.md": true
-  }
+    "workbench.colorTheme": "Dracula Theme",
+    "python.analysis.extraPaths": [],
+    "editor.minimap.enabled": false,
+    "makefile.configureOnOpen": true,
+    "chat.instructionsFilesLocations": {
+        ".github/instructions": true,
+        "/var/folders/mc/h3_0h98d46qfklpzc_4m55dr0000gn/T/postman-collections-post-response.instructions.md": true,
+        "/var/folders/mc/h3_0h98d46qfklpzc_4m55dr0000gn/T/postman-collections-pre-request.instructions.md": true,
+        "/var/folders/mc/h3_0h98d46qfklpzc_4m55dr0000gn/T/postman-folder-post-response.instructions.md": true,
+        "/var/folders/mc/h3_0h98d46qfklpzc_4m55dr0000gn/T/postman-folder-pre-request.instructions.md": true,
+        "/var/folders/mc/h3_0h98d46qfklpzc_4m55dr0000gn/T/postman-http-request-post-response.instructions.md": true,
+        "/var/folders/mc/h3_0h98d46qfklpzc_4m55dr0000gn/T/postman-http-request-pre-request.instructions.md": true
+    }
 }

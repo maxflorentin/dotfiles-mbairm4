@@ -1,3 +1,4 @@
+anthropic.claude-code
 databricks.databricks
 dracula-theme.theme-dracula
 enkia.tokyo-night
@@ -12,6 +13,7 @@ ms-toolsai.jupyter-keymap
 ms-toolsai.jupyter-renderers
 ms-toolsai.vscode-jupyter-cell-tags
 ms-toolsai.vscode-jupyter-slideshow
-redhat.vscode-yaml
 ms-vscode.makefile-tools
+postman.postman-for-vscode
+redhat.vscode-yaml
 vscodevim.vim
