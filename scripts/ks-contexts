@@ -20,12 +20,18 @@ fi
 
 # Look for keychains in the Keychains directory
 if [ -d "${KEYCHAIN_DIR}" ]; then
-    for keychain in "${KEYCHAIN_DIR}"/ks-*.keychain*; do
+    for keychain in "${KEYCHAIN_DIR}"/*.keychain-db; do
         if [ -e "$keychain" ]; then
-            found=1
             # Extract context name from filename
             basename=$(basename "$keychain")
-            context=$(echo "$basename" | sed 's/ks-//' | sed 's/.keychain.*//')
+            context=$(echo "$basename" | sed 's/.keychain-db//')
+
+            # Skip system keychains
+            if [ "$context" = "login" ] || [ "$context" = "metadata" ] || [ "$context" = "System" ]; then
+                continue
+            fi
+
+            found=1
 
             # Mark current context
             if [ "$context" = "$current" ]; then

@@ -13,7 +13,7 @@ fi
 CONTEXT="$1"
 KEYCHAIN_DIR="${HOME}/Library/Keychains"
 ICLOUD_DIR="${HOME}/Library/Mobile Documents/com~apple~CloudDocs/keychains"
-KEYCHAIN_FILE="ks-${CONTEXT}.keychain"
+KEYCHAIN_FILE="${CONTEXT}.keychain-db"
 
 # Check if keychain exists in iCloud
 if [ ! -e "${ICLOUD_DIR}/${KEYCHAIN_FILE}" ]; then

@@ -24,11 +24,17 @@ found_local=0
 found_icloud=0
 
 echo "Local Keychains:"
-for keychain in "${KEYCHAIN_DIR}"/ks-*.keychain*; do
+for keychain in "${KEYCHAIN_DIR}"/*.keychain-db; do
     if [ -e "$keychain" ]; then
-        found_local=1
         basename=$(basename "$keychain")
-        context=$(echo "$basename" | sed 's/ks-//' | sed 's/.keychain.*//')
+        context=$(echo "$basename" | sed 's/.keychain-db//')
+
+        # Skip system keychains
+        if [ "$context" = "login" ] || [ "$context" = "metadata" ] || [ "$context" = "System" ]; then
+            continue
+        fi
+
+        found_local=1
 
         if [ -L "$keychain" ]; then
             target=$(readlink "$keychain")
@@ -49,11 +55,11 @@ fi
 
 echo ""
 echo "iCloud Keychains:"
-for keychain in "${ICLOUD_DIR}"/ks-*.keychain*; do
+for keychain in "${ICLOUD_DIR}"/*.keychain-db; do
     if [ -e "$keychain" ]; then
         found_icloud=1
         basename=$(basename "$keychain")
-        context=$(echo "$basename" | sed 's/ks-//' | sed 's/.keychain.*//')
+        context=$(echo "$basename" | sed 's/.keychain-db//')
 
         # Check if linked locally
         if [ -L "${KEYCHAIN_DIR}/${basename}" ]; then
