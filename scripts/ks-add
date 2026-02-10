@@ -70,13 +70,21 @@ fi
 
 echo "Adding secret to context: ${CONTEXT}"
 
+# If no value provided, prompt for it securely
+if [ -z "$VALUE" ]; then
+    echo -n "Enter value for '${KEY}' (input hidden): "
+    read -s VALUE
+    echo ""  # New line after hidden input
+
+    if [ -z "$VALUE" ]; then
+        echo "✗ Error: No value provided"
+        exit 1
+    fi
+fi
+
 # Function to add the secret
 add_secret() {
-    if [ -z "$VALUE" ]; then
-        ks -k "${CONTEXT}" add "${KEY}"
-    else
-        ks -k "${CONTEXT}" add "${KEY}" "${VALUE}"
-    fi
+    ks -k "${CONTEXT}" add "${KEY}" "${VALUE}"
 }
 
 # Try to add the secret

@@ -15,6 +15,7 @@ alias ksg='ks-get-context'
 alias ksi='ks-init-context'
 alias ksa='ks-add'
 alias ksget='ks-get'
+alias kscp='ks-cp'
 alias ksl='ks-list'
 alias ksctx='ks-contexts'
 
@@ -22,3 +23,20 @@ alias ksctx='ks-contexts'
 alias ks-sync='ks-sync-status'
 alias ks-enable-sync='ks-sync-enable'
 alias ks-link-sync='ks-sync-link'
+
+# KS Trust Setup (reduce password prompts)
+alias ks-trust='ks-trust-setup'
+
+# ==========================================
+# ENVY - Modern Encrypted Secret Manager
+# ==========================================
+# Add envy scripts to PATH
+export PATH="$HOME/projects/dotfiles/scripts/envy:$PATH"
+
+# Envy shortcuts (optional - scripts are already in PATH)
+alias ev='envy-list'  # Quick list
+alias evl='envy-load' # Quick load
+alias evs='envy-set'  # Quick set
+alias evg='envy-get'  # Quick get
+
+alias clau='claude'

@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# envy-new: Create a new envy context
+# Usage: envy-new <context-name>
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_KEYS_DIR="${ENVY_DIR}/keys"
+
+if [ -z "$1" ]; then
+    echo "Usage: envy-new <context-name>"
+    echo ""
+    echo "Example:"
+    echo "  envy-new personal"
+    echo "  envy-new work"
+    echo "  envy-new project-xyz"
+    exit 1
+fi
+
+CONTEXT="$1"
+KEY_FILE="${ENVY_KEYS_DIR}/${CONTEXT}.key"
+ENVY_FILE="${ENVY_DIR}/${CONTEXT}.envy.age"
+
+# Check if envy is initialized
+if [ ! -d "${ENVY_DIR}" ]; then
+    echo "❌ Envy not initialized. Run: envy-init"
+    exit 1
+fi
+
+# Check if context already exists
+if [ -f "${KEY_FILE}" ]; then
+    echo "❌ Context '${CONTEXT}' already exists"
+    echo ""
+    echo "Available contexts:"
+    ls -1 "${ENVY_KEYS_DIR}" | sed 's/.key$//' | sed 's/^/  • /'
+    exit 1
+fi
+
+echo "🔐 Creating new context: ${CONTEXT}"
+echo ""
+
+# Generate age key
+echo "Generating encryption key..."
+age-keygen -o "${KEY_FILE}" 2>&1 | grep -v "Public key:"
+
+# Extract public key
+PUBLIC_KEY=$(age-keygen -y "${KEY_FILE}")
+
+echo "✓ Key generated"
+echo "  Private key: ${KEY_FILE}"
+echo "  Public key: ${PUBLIC_KEY}"
+echo ""
+
+# Create empty encrypted file
+echo "# Environment: ${CONTEXT}" | age -r "${PUBLIC_KEY}" -o "${ENVY_FILE}"
+echo "✓ Created encrypted file: ${ENVY_FILE}"
+
+echo ""
+echo "✅ Context '${CONTEXT}' created successfully!"
+echo ""
+echo "Next steps:"
+echo "  envy-switch ${CONTEXT}           # Switch to this context"
+echo "  envy-set KEY 'value'          # Add secrets"
+echo "  envy-load ${CONTEXT}          # Load secrets"
+echo ""
+echo "⚠️  IMPORTANT: Backup your key file securely!"
+echo "   ${KEY_FILE}"

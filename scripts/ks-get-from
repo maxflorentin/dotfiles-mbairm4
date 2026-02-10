@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# ks-get-from: Get a secret from a specific context (without switching)
+# Usage: ks-get-from <context> <key> [timeout]
+# Example: ks-get-from personal GITHUB_TOKEN 2
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Error: Context and key required" >&2
+    echo "Usage: ks-get-from <context> <key> [timeout]" >&2
+    echo "Example: ks-get-from personal GITHUB_TOKEN 2" >&2
+    exit 1
+fi
+
+CONTEXT="$1"
+KEY="$2"
+TIMEOUT="${3:-2}"  # Default 2 seconds timeout
+
+# Check if ks is installed
+if ! command -v ks &> /dev/null; then
+    exit 1
+fi
+
+# Get the secret with timeout to prevent hanging
+# Use timeout command if available, otherwise just run normally
+if command -v timeout &> /dev/null; then
+    timeout "${TIMEOUT}s" ks -k "${CONTEXT}" show "${KEY}" 2>/dev/null
+else
+    # Fallback without timeout (macOS doesn't have timeout by default)
+    ks -k "${CONTEXT}" show "${KEY}" 2>/dev/null &
+    local pid=$!
+    ( sleep "${TIMEOUT}" && kill -9 $pid 2>/dev/null ) &
+    wait $pid 2>/dev/null
+fi

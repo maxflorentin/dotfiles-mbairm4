@@ -1,0 +1,73 @@
+#!/bin/bash
+
+# envy-migrate-from-ks: Migrate secrets from KS to envy
+# Usage: envy-migrate-from-ks <ks-context> <KEY1> [KEY2] [KEY3...]
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_CONFIG="${ENVY_DIR}/config"
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: envy-migrate-from-ks <ks-context> <KEY1> [KEY2...]"
+    echo ""
+    echo "Example:"
+    echo "  envy-migrate-from-ks personal GITHUB_TOKEN OPENAI_API_KEY"
+    echo "  envy-migrate-from-ks yuno KINGDOM_TOKEN DD_API_KEY DD_APP_KEY"
+    exit 1
+fi
+
+KS_CONTEXT="$1"
+shift  # Remove first argument, rest are keys
+
+# Check if ks is available
+if ! command -v ks &> /dev/null; then
+    echo "❌ ks is not installed"
+    exit 1
+fi
+
+# Get or create envy context (use same name as KS context)
+ENVY_CONTEXT="${KS_CONTEXT}"
+
+# Check if envy context exists
+if [ ! -f "${ENVY_DIR}/keys/${ENVY_CONTEXT}.key" ]; then
+    echo "Creating envy context: ${ENVY_CONTEXT}"
+    envy-new "${ENVY_CONTEXT}"
+    echo ""
+fi
+
+# Switch to this context
+envy-switch "${ENVY_CONTEXT}"
+
+echo "🔄 Migrating from KS context: ${KS_CONTEXT}"
+echo ""
+
+MIGRATED=0
+FAILED=0
+
+for KEY in "$@"; do
+    echo -n "  ${KEY}... "
+
+    # Get value from KS
+    VALUE=$(ks -k "${KS_CONTEXT}" show "${KEY}" 2>/dev/null || echo "")
+
+    if [ -n "${VALUE}" ]; then
+        envy-set "${KEY}" "${VALUE}" > /dev/null 2>&1
+        echo "✓"
+        ((MIGRATED++))
+    else
+        echo "✗ (not found in KS)"
+        ((FAILED++))
+    fi
+done
+
+echo ""
+echo "✅ Migration complete!"
+echo "   Migrated: ${MIGRATED}"
+if [ ${FAILED} -gt 0 ]; then
+    echo "   Failed: ${FAILED}"
+fi
+echo ""
+echo "Verify:"
+echo "  envy-list ${ENVY_CONTEXT}"
+echo "  envy-load ${ENVY_CONTEXT}"

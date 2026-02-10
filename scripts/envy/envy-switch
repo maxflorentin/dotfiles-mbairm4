@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# envy-switch: Switch to a different context
+# Usage: envy-switch <context>
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_KEYS_DIR="${ENVY_DIR}/keys"
+ENVY_CONFIG="${ENVY_DIR}/config"
+
+if [ -z "$1" ]; then
+    echo "Usage: envy-switch <context>"
+    echo ""
+    echo "Available contexts:"
+    ls -1 "${ENVY_KEYS_DIR}" 2>/dev/null | sed 's/.key$//' | sed 's/^/  • /' || echo "  (none)"
+    exit 1
+fi
+
+CONTEXT="$1"
+KEY_FILE="${ENVY_KEYS_DIR}/${CONTEXT}.key"
+
+if [ ! -f "${KEY_FILE}" ]; then
+    echo "❌ Context '${CONTEXT}' not found"
+    echo ""
+    echo "Available contexts:"
+    ls -1 "${ENVY_KEYS_DIR}" 2>/dev/null | sed 's/.key$//' | sed 's/^/  • /'
+    echo ""
+    echo "Create new context: envy-new ${CONTEXT}"
+    exit 1
+fi
+
+echo "${CONTEXT}" > "${ENVY_CONFIG}"
+echo "✓ Switched to context: ${CONTEXT}"
+echo ""
+echo "Load variables: envy-load ${CONTEXT}"

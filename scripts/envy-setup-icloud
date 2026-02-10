@@ -1,0 +1,154 @@
+#!/bin/bash
+
+# envy-setup-icloud: Move envy to iCloud Drive for automatic sync
+# Usage: envy-setup-icloud
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+ICLOUD_DIR="${HOME}/Library/Mobile Documents/com~apple~CloudDocs"
+ENVY_ICLOUD_DIR="${ICLOUD_DIR}/.envy"
+
+echo "🔐 Envy iCloud Setup"
+echo ""
+
+# Check if iCloud is available
+if [ ! -d "${ICLOUD_DIR}" ]; then
+    echo "❌ iCloud Drive not available"
+    echo "Please enable iCloud Drive in System Settings"
+    exit 1
+fi
+
+echo "✓ iCloud Drive is available"
+
+# Check if envy is initialized
+if [ ! -d "${ENVY_DIR}" ]; then
+    echo "📦 Initializing envy first..."
+    envy-init
+fi
+
+# Check if already using iCloud
+if [ -L "${ENVY_DIR}" ]; then
+    CURRENT_TARGET=$(readlink "${ENVY_DIR}")
+    if [ "${CURRENT_TARGET}" = "${ENVY_ICLOUD_DIR}" ]; then
+        echo "✓ Already using iCloud!"
+        echo "Location: ${ENVY_ICLOUD_DIR}"
+        exit 0
+    fi
+fi
+
+echo ""
+echo "This will:"
+echo "  1. Move ${ENVY_DIR} to iCloud Drive"
+echo "  2. Create a symlink for compatibility"
+echo "  3. Enable automatic sync across devices"
+echo ""
+read -p "Continue? (y/N): " CONFIRM
+
+if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 0
+fi
+
+echo ""
+
+# Backup existing envy directory if it exists
+if [ -d "${ENVY_DIR}" ] && [ ! -L "${ENVY_DIR}" ]; then
+    echo "📦 Moving existing envy to iCloud..."
+
+    # Move to iCloud
+    mv "${ENVY_DIR}" "${ENVY_ICLOUD_DIR}"
+    echo "✓ Moved to: ${ENVY_ICLOUD_DIR}"
+
+    # Create symlink
+    ln -s "${ENVY_ICLOUD_DIR}" "${ENVY_DIR}"
+    echo "✓ Created symlink: ${ENVY_DIR} -> ${ENVY_ICLOUD_DIR}"
+else
+    # Create new structure in iCloud
+    echo "📦 Creating envy structure in iCloud..."
+    mkdir -p "${ENVY_ICLOUD_DIR}/keys"
+
+    # Create symlink
+    if [ -L "${ENVY_DIR}" ]; then
+        rm "${ENVY_DIR}"
+    fi
+    ln -s "${ENVY_ICLOUD_DIR}" "${ENVY_DIR}"
+    echo "✓ Created: ${ENVY_ICLOUD_DIR}"
+    echo "✓ Linked: ${ENVY_DIR} -> ${ENVY_ICLOUD_DIR}"
+fi
+
+# Update .gitignore in iCloud
+cat > "${ENVY_ICLOUD_DIR}/.gitignore" <<EOF
+# Never commit private keys!
+keys/
+*.key
+
+# Decrypted files (if any)
+*.envy
+!*.envy.age
+EOF
+
+echo "✓ Updated .gitignore"
+
+# Create README
+cat > "${ENVY_ICLOUD_DIR}/README.md" <<EOF
+# Envy Secrets (iCloud Sync)
+
+This directory is synced via iCloud Drive.
+
+## What's synced:
+- ✅ \`*.envy.age\` - Encrypted secrets (safe to sync)
+- ✅ \`keys/\` - Private keys (for convenience)
+- ✅ \`config\` - Current context
+
+## Security Notes:
+
+**Encrypted files (\`.envy.age\`):**
+- ✅ Safe to sync - requires private key to decrypt
+- ✅ Can be shared between your devices
+
+**Private keys (\`keys/*.key\`):**
+- ⚠️  Synced to iCloud for convenience
+- ⚠️  Consider storing in 1Password for extra security
+- ❌ Never share these keys publicly
+
+## Alternative: Store keys in 1Password
+
+For maximum security:
+1. Store keys in 1Password
+2. Keep only \`.envy.age\` files in iCloud
+3. Retrieve keys on each device manually
+
+## Usage:
+
+\`\`\`bash
+# Works exactly the same - symlink handles everything
+envy-load personal
+envy-set GITHUB_TOKEN "xxx"
+envy-list
+\`\`\`
+
+## Sync Status:
+
+Check iCloud sync status:
+\`\`\`bash
+ls -l ~/.envy          # Should show symlink
+ls -la "${ENVY_ICLOUD_DIR}"
+\`\`\`
+EOF
+
+echo "✓ Created README"
+
+echo ""
+echo "✅ Envy is now using iCloud!"
+echo ""
+echo "📍 Location: ${ENVY_ICLOUD_DIR}"
+echo "🔗 Symlink: ${ENVY_DIR} -> ${ENVY_ICLOUD_DIR}"
+echo ""
+echo "Next steps:"
+echo "  1. Create contexts: envy-new personal && envy-new yuno"
+echo "  2. Migrate from KS: envy-migrate-from-ks"
+echo "  3. On other devices: Run this script to link iCloud"
+echo ""
+echo "⚠️  Keys are synced to iCloud for convenience."
+echo "   For maximum security, store them in 1Password instead."

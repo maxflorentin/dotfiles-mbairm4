@@ -1,0 +1,118 @@
+#!/bin/bash
+
+# migrate-ks-to-envy: Complete migration from KS to Envy (interactive)
+# Usage: ./migrate-ks-to-envy
+
+set -e
+
+echo "🚀 KS → Envy Migration Wizard"
+echo ""
+echo "This will:"
+echo "  1. Setup envy in iCloud (automatic sync)"
+echo "  2. List your current KS secrets"
+echo "  3. Migrate them to envy"
+echo "  4. Verify everything works"
+echo ""
+read -p "Ready to start? (y/N): " CONFIRM
+
+if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 0
+fi
+
+# Step 1: Setup iCloud
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Step 1: Setup Envy with iCloud"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+./envy-setup-icloud
+
+# Step 2: List KS contexts
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Step 2: Discover KS Secrets"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+if ! command -v ks &> /dev/null; then
+    echo "⚠️  KS not installed - skipping migration"
+    echo "You can add secrets manually with: envy-set"
+    exit 0
+fi
+
+echo "Checking KS contexts..."
+echo ""
+
+# Check for personal context
+echo "📦 Personal context:"
+if ks -k personal ls &> /dev/null; then
+    PERSONAL_KEYS=$(ks -k personal ls 2>/dev/null | tr '\n' ' ')
+    echo "Found keys: $PERSONAL_KEYS"
+    HAS_PERSONAL=true
+else
+    echo "No personal context found"
+    HAS_PERSONAL=false
+fi
+echo ""
+
+# Check for yuno context
+echo "📦 Yuno context:"
+if ks -k yuno ls &> /dev/null; then
+    YUNO_KEYS=$(ks -k yuno ls 2>/dev/null | tr '\n' ' ')
+    echo "Found keys: $YUNO_KEYS"
+    HAS_YUNO=true
+else
+    echo "No yuno context found"
+    HAS_YUNO=false
+fi
+echo ""
+
+# Step 3: Migrate
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Step 3: Migrate Secrets"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+if [ "$HAS_PERSONAL" = true ]; then
+    echo "Migrate personal context?"
+    read -p "Keys: $PERSONAL_KEYS (y/N): " MIGRATE_PERSONAL
+
+    if [[ "$MIGRATE_PERSONAL" =~ ^[Yy]$ ]]; then
+        echo ""
+        ./envy/envy-migrate-from-ks personal $PERSONAL_KEYS
+        echo ""
+    fi
+fi
+
+if [ "$HAS_YUNO" = true ]; then
+    echo "Migrate yuno context?"
+    read -p "Keys: $YUNO_KEYS (y/N): " MIGRATE_YUNO
+
+    if [[ "$MIGRATE_YUNO" =~ ^[Yy]$ ]]; then
+        echo ""
+        ./envy/envy-migrate-from-ks yuno $YUNO_KEYS
+        echo ""
+    fi
+fi
+
+# Step 4: Verify
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Step 4: Verification"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+echo "📋 Available contexts:"
+./envy/envy-list
+echo ""
+
+echo "✅ Migration complete!"
+echo ""
+echo "Next steps:"
+echo "  1. Test loading: evl personal"
+echo "  2. Test loading: evl yuno"
+echo "  3. Verify secrets: echo \$GITHUB_TOKEN"
+echo "  4. Read guide: cat ENVY_MIGRATION_GUIDE.md"
+echo ""
+echo "🎉 Enjoy zero password prompts!"
