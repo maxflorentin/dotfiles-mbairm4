@@ -6,6 +6,9 @@ alias jira-create='~/Scripts/dotfiles/jira_create_ticket.py'
 alias jira-md2adf='~/Scripts/dotfiles/markdown_to_jira_adf.py'
 alias jira-merge='~/Scripts/dotfiles/jira_merge_json.py'
 
+# Patent Verification
+alias patent='~/projects/dotfiles/scripts/patent_verifier.py'
+
 # KS (Keychain Secrets) Context Management
 # Auto-load current context on shell start
 export KS_DEFAULT_KEYCHAIN=$(cat ~/.config/ks/current-context 2>/dev/null || echo 'personal')
