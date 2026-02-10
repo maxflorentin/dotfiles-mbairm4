@@ -9,17 +9,30 @@ ENVY_DIR="${HOME}/.envy"
 ENVY_KEYS_DIR="${ENVY_DIR}/keys"
 ENVY_CONFIG="${ENVY_DIR}/config"
 
-if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Usage: envy-set <KEY> <value>"
+if [ -z "$1" ]; then
+    echo "Usage: envy-set <KEY> [value]"
     echo ""
-    echo "Example:"
-    echo "  envy-set GITHUB_TOKEN 'ghp_xxxx'"
+    echo "Examples:"
+    echo "  envy-set GITHUB_TOKEN              # Prompt for value (secure)"
+    echo "  envy-set GITHUB_TOKEN 'ghp_xxxx'   # Pass value directly"
     echo "  envy-set API_KEY 'sk-xxxx'"
     exit 1
 fi
 
 KEY="$1"
 VALUE="$2"
+
+# If no value provided, prompt for it securely
+if [ -z "$VALUE" ]; then
+    echo -n "Enter value for '${KEY}' (input hidden): "
+    read -s VALUE
+    echo ""  # New line after hidden input
+
+    if [ -z "$VALUE" ]; then
+        echo "✗ Error: No value provided"
+        exit 1
+    fi
+fi
 
 # Get current context
 if [ ! -f "${ENVY_CONFIG}" ]; then

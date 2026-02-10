@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# envy-add-multiple: Add multiple secrets interactively with secure prompts
+# Usage: envy-add-multiple <context> <KEY1> <KEY2> <KEY3> ...
+
+set -e
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: envy-add-multiple <context> <KEY1> [KEY2] [KEY3] ..."
+    echo ""
+    echo "Example:"
+    echo "  envy-add-multiple yuno KINGDOM_TOKEN DD_API_KEY DD_APP_KEY"
+    echo ""
+    echo "This will prompt you for each value securely (no CLI history)"
+    exit 1
+fi
+
+CONTEXT="$1"
+shift  # Remove context, rest are keys
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_CONFIG="${ENVY_DIR}/config"
+
+# Check if context exists
+if [ ! -f "${ENVY_DIR}/keys/${CONTEXT}.key" ]; then
+    echo "❌ Context '${CONTEXT}' not found"
+    echo "Create it with: envy-new ${CONTEXT}"
+    exit 1
+fi
+
+# Switch to context
+echo "Switching to context: ${CONTEXT}"
+envy-switch "${CONTEXT}" > /dev/null
+echo ""
+
+# Add each key
+for KEY in "$@"; do
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Adding: ${KEY}"
+    echo ""
+
+    # Check if key already exists
+    if age -d -i "${ENVY_DIR}/keys/${CONTEXT}.key" "${ENVY_DIR}/${CONTEXT}.envy.age" 2>/dev/null | grep -q "^${KEY}="; then
+        echo "⚠️  Key '${KEY}' already exists"
+        read -p "Overwrite? (y/N): " OVERWRITE
+        if [[ ! "$OVERWRITE" =~ ^[Yy]$ ]]; then
+            echo "Skipped."
+            echo ""
+            continue
+        fi
+        echo ""
+    fi
+
+    # Prompt for value
+    echo -n "Enter value for '${KEY}' (input hidden): "
+    read -s VALUE
+    echo ""
+
+    if [ -z "$VALUE" ]; then
+        echo "✗ Skipped (no value provided)"
+        echo ""
+        continue
+    fi
+
+    # Add to envy
+    envy-set "${KEY}" "${VALUE}" 2>/dev/null
+    echo "✓ Added: ${KEY}"
+    echo ""
+done
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ All secrets added!"
+echo ""
+echo "Verify with: envy-list ${CONTEXT}"
