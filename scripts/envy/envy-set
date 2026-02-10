@@ -13,24 +13,49 @@ if [ -z "$1" ]; then
     echo "Usage: envy-set <KEY> [value]"
     echo ""
     echo "Examples:"
-    echo "  envy-set GITHUB_TOKEN              # Prompt for value (secure)"
-    echo "  envy-set GITHUB_TOKEN 'ghp_xxxx'   # Pass value directly"
-    echo "  envy-set API_KEY 'sk-xxxx'"
+    echo "  envy-set -c GITHUB_TOKEN           # From clipboard (recommended)"
+    echo "  envy-set GITHUB_TOKEN              # Secure prompt (typing only)"
+    echo "  envy-set GITHUB_TOKEN 'ghp_xxxx'   # Pass directly (insecure)"
     exit 1
+fi
+
+# Parse flags
+USE_CLIPBOARD=false
+if [ "$1" = "-c" ]; then
+    USE_CLIPBOARD=true
+    shift
 fi
 
 KEY="$1"
 VALUE="$2"
 
-# If no value provided, prompt for it securely
+# If no value provided, get it from clipboard or prompt
 if [ -z "$VALUE" ]; then
-    echo -n "Enter value for '${KEY}' (input hidden): "
-    read -s VALUE
-    echo ""  # New line after hidden input
+    if [ "$USE_CLIPBOARD" = true ]; then
+        # Read from clipboard
+        VALUE=$(pbpaste)
+        if [ -z "$VALUE" ]; then
+            echo "✗ Error: Clipboard is empty"
+            exit 1
+        fi
+        echo "✓ Read from clipboard (${#VALUE} chars)"
+    else
+        # Secure prompt with stty (better paste support than read -s)
+        echo -n "Enter value for '${KEY}' (input hidden): "
 
-    if [ -z "$VALUE" ]; then
-        echo "✗ Error: No value provided"
-        exit 1
+        # Disable echo, read input, restore echo
+        stty -echo
+        read VALUE
+        stty echo
+
+        echo ""  # New line after hidden input
+
+        if [ -z "$VALUE" ]; then
+            echo "✗ Error: No value provided"
+            exit 1
+        fi
+
+        echo "Tip: Use 'envy-set -c ${KEY}' to paste from clipboard instead"
     fi
 fi
 
@@ -64,16 +89,35 @@ else
     echo "# Environment: ${CONTEXT}" > "${TEMP_FILE}"
 fi
 
+# Check if value is multiline
+if echo "$VALUE" | grep -q $'\n'; then
+    # Encode multiline values in base64 for safe storage
+    ENCODED_VALUE=$(echo "$VALUE" | base64)
+    STORE_VALUE="base64:${ENCODED_VALUE}"
+    IS_MULTILINE=true
+else
+    STORE_VALUE="${VALUE}"
+    IS_MULTILINE=false
+fi
+
 # Update or add the key
 if grep -q "^${KEY}=" "${TEMP_FILE}"; then
-    # Update existing key
-    sed -i.bak "s|^${KEY}=.*|${KEY}=${VALUE}|" "${TEMP_FILE}"
+    # Update existing key (use | as delimiter to avoid issues with /)
+    sed -i.bak "s|^${KEY}=.*|${KEY}=${STORE_VALUE}|" "${TEMP_FILE}"
     rm -f "${TEMP_FILE}.bak"
-    echo "✓ Updated: ${KEY}"
+    if [ "$IS_MULTILINE" = true ]; then
+        echo "✓ Updated: ${KEY} (multiline, base64 encoded)"
+    else
+        echo "✓ Updated: ${KEY}"
+    fi
 else
     # Add new key
-    echo "${KEY}=${VALUE}" >> "${TEMP_FILE}"
-    echo "✓ Added: ${KEY}"
+    echo "${KEY}=${STORE_VALUE}" >> "${TEMP_FILE}"
+    if [ "$IS_MULTILINE" = true ]; then
+        echo "✓ Added: ${KEY} (multiline, base64 encoded)"
+    else
+        echo "✓ Added: ${KEY}"
+    fi
 fi
 
 # Re-encrypt

@@ -52,14 +52,41 @@ for KEY in "$@"; do
     fi
 
     # Prompt for value
-    echo -n "Enter value for '${KEY}' (input hidden): "
-    read -s VALUE
-    echo ""
+    echo "Enter value for '${KEY}' (paste supported):"
+    echo "Press Ctrl+D when done, 's' to skip, 'c' to use clipboard"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    if [ -z "$VALUE" ]; then
-        echo "✗ Skipped (no value provided)"
+    # Read first character to check for special commands
+    read -n 1 -r FIRST_CHAR
+
+    if [ "$FIRST_CHAR" = "s" ]; then
+        echo ""
+        echo "✗ Skipped"
         echo ""
         continue
+    elif [ "$FIRST_CHAR" = "c" ]; then
+        echo ""
+        VALUE=$(pbpaste)
+        if [ -z "$VALUE" ]; then
+            echo "✗ Clipboard is empty"
+            echo ""
+            continue
+        fi
+        echo "✓ Read from clipboard"
+    else
+        # Continue reading the rest
+        if [ -n "$FIRST_CHAR" ]; then
+            echo -n "$FIRST_CHAR"
+        fi
+        VALUE=$(cat)
+        VALUE="${FIRST_CHAR}${VALUE}"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+        if [ -z "$VALUE" ]; then
+            echo "✗ Skipped (no value provided)"
+            echo ""
+            continue
+        fi
     fi
 
     # Add to envy

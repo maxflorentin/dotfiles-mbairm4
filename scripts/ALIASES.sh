@@ -34,9 +34,11 @@ alias ks-trust='ks-trust-setup'
 export PATH="$HOME/projects/dotfiles/scripts/envy:$PATH"
 
 # Envy shortcuts (optional - scripts are already in PATH)
-alias ev='envy-list'  # Quick list
-alias evl='envy-load' # Quick load
-alias evs='envy-set'  # Quick set
-alias evg='envy-get'  # Quick get
+alias ev='envy-list'     # Quick list
+alias evl='envy-load'    # Quick load
+alias evs='envy-set'     # Quick set
+alias evg='envy-get'     # Quick get
+alias evrm='envy-rm'     # Quick remove
+alias evsw='envy-switch' # Quick switch context
 
 alias clau='claude'

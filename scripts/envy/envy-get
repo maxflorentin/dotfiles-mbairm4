@@ -44,4 +44,11 @@ if [ -z "${VALUE}" ]; then
     exit 1
 fi
 
-echo "${VALUE}"
+# Check if value is base64 encoded (multiline)
+if [[ "${VALUE}" == base64:* ]]; then
+    # Decode base64
+    ENCODED="${VALUE#base64:}"
+    echo "${ENCODED}" | base64 -d
+else
+    echo "${VALUE}"
+fi

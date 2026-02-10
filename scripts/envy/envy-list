@@ -38,8 +38,13 @@ if [ -n "$1" ]; then
 
     if [ -f "${ENVY_FILE}" ]; then
         age -d -i "${KEY_FILE}" "${ENVY_FILE}" 2>/dev/null | grep -v '^#' | grep '=' | while IFS='=' read -r key value; do
-            # Show key with masked value
-            echo "  ${key}=${value:0:4}***"
+            # Check if multiline (base64 encoded)
+            if [[ "${value}" == base64:* ]]; then
+                echo "  ${key}=<multiline> 📄"
+            else
+                # Show key with masked value
+                echo "  ${key}=${value:0:4}***"
+            fi
         done
     else
         echo "  (empty)"
