@@ -32,6 +32,9 @@ domain = os.getenv("JIRA_DOMAIN")
 if not all([email, token, domain]):
     raise ValueError("Missing environment variables: JIRA_EMAIL, JIRA_API_TOKEN or JIRA_DOMAIN")
 
+# Clean up domain: remove https://, http://, and trailing slashes
+domain = domain.replace("https://", "").replace("http://", "").rstrip("/")
+
 if ".atlassian.net" in domain:
     base_url = f"https://{domain}"
 else:
@@ -51,10 +54,11 @@ def get_current_user():
         return response.json().get("accountId")
     return None
 
-def get_active_sprint(board_id=None):
+def get_active_sprint(board_id=None, sprint_pattern=None):
     """
-    Get the active sprint ID for a board.
-    If board_id is not provided, tries to find the first active sprint.
+    Get the active sprint ID and name for a board.
+    If board_id is not provided, tries to find the first active sprint matching the pattern.
+    Returns: tuple (sprint_id, sprint_name) or (None, None)
     """
     if board_id:
         url = f"{base_url}/rest/agile/1.0/board/{board_id}/sprint"
@@ -62,8 +66,9 @@ def get_active_sprint(board_id=None):
         response = requests.get(url, headers=headers, auth=auth, params=params)
         if response.status_code == 200:
             sprints = response.json().get("values", [])
-            if sprints:
-                return sprints[0]["id"]
+            for sprint in sprints:
+                if not sprint_pattern or sprint_pattern.lower() in sprint["name"].lower():
+                    return sprint["id"], sprint["name"]
 
     url = f"{base_url}/rest/agile/1.0/board"
     response = requests.get(url, headers=headers, auth=auth)
@@ -74,9 +79,10 @@ def get_active_sprint(board_id=None):
             sprint_response = requests.get(sprint_url, headers=headers, auth=auth, params={"state": "active"})
             if sprint_response.status_code == 200:
                 sprints = sprint_response.json().get("values", [])
-                if sprints:
-                    return sprints[0]["id"]
-    return None
+                for sprint in sprints:
+                    if not sprint_pattern or sprint_pattern.lower() in sprint["name"].lower():
+                        return sprint["id"], sprint["name"]
+    return None, None
 
 def create_issue(payload):
     """
@@ -113,10 +119,14 @@ def create_issue(payload):
     auto_sprint = os.getenv("JIRA_AUTO_SPRINT", "true").lower() == "true"
     if auto_sprint and sprint_field not in payload["fields"]:
         board_id = os.getenv("JIRA_BOARD_ID")
-        sprint_id = get_active_sprint(int(board_id) if board_id else None)
+        sprint_pattern = os.getenv("JIRA_SPRINT_PATTERN", "Analytics")
+        sprint_id, sprint_name = get_active_sprint(
+            int(board_id) if board_id else None,
+            sprint_pattern
+        )
         if sprint_id:
             payload["fields"][sprint_field] = sprint_id
-            print(f"→ Adding to active sprint (ID: {sprint_id})")
+            print(f"→ Adding to active sprint: {sprint_name}")
 
     url = f"{base_url}/rest/api/3/issue"
     response = requests.post(url, data=json.dumps(payload), headers=headers, auth=auth)

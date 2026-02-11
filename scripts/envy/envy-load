@@ -59,7 +59,16 @@ DECRYPTED=$(age -d -i "${KEY_FILE}" "${ENVY_FILE}" 2>/dev/null)
 if [ "${EXPORT_MODE}" = true ]; then
     # Export mode: output export statements
     echo "${DECRYPTED}" | grep -v '^#' | grep '=' | while IFS= read -r line; do
-        echo "export ${line}"
+        KEY="${line%%=*}"
+        VALUE="${line#*=}"
+
+        # Decode base64-encoded values
+        if [[ "${VALUE}" =~ ^base64: ]]; then
+            DECODED_VALUE=$(echo "${VALUE#base64:}" | base64 -d)
+            echo "export ${KEY}='${DECODED_VALUE}'"
+        else
+            echo "export ${line}"
+        fi
     done
 else
     # Interactive mode: show what would be loaded
