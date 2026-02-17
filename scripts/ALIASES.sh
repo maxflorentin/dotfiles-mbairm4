@@ -45,3 +45,6 @@ alias evrm='envy-rm'     # Quick remove
 alias evsw='envy-switch' # Quick switch context
 
 alias clau='claude'
+
+# Alias para invocar a tu Alter Ego con Gemini 3 Flash (Free Tier)
+alias xam='gemini --model gemini-3-flash --system-path ~/.gemini/identity.md'
