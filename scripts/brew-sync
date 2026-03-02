@@ -1,0 +1,30 @@
+#!/bin/bash
+# brew-sync: Dump current brew state to Brewfile and commit if changed
+# Scheduled via cron: 0 20 * * * /Users/maximilianoflorentin/Scripts/dotfiles/brew-sync
+
+set -euo pipefail
+
+DOTFILES="$HOME/.dotfiles"
+BREWFILE="$DOTFILES/Brewfile"
+LOG="$HOME/.claude/logs/brew-sync.log"
+
+mkdir -p "$(dirname "$LOG")"
+
+echo "[$(date)] brew-sync started" >> "$LOG"
+
+# Dump current state
+brew bundle dump --file="$BREWFILE" --force 2>> "$LOG"
+
+# Check if anything changed
+cd "$DOTFILES"
+if git diff --quiet "$BREWFILE" 2>/dev/null; then
+  echo "[$(date)] No changes" >> "$LOG"
+  exit 0
+fi
+
+# Commit and push
+git add "$BREWFILE"
+git commit -m "brew-sync: update Brewfile $(date +%Y-%m-%d)" >> "$LOG" 2>&1
+git push >> "$LOG" 2>&1
+
+echo "[$(date)] Brewfile updated and pushed" >> "$LOG"
