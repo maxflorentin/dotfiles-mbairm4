@@ -1,5 +1,6 @@
 # Path to your dotfiles.
 export DOTFILES=$HOME/.dotfiles
+export DIRENV_LOG_FORMAT=" "
 
 # Load environment variables if .env exists
 # Disabled in favor of direnv - see .envrc
@@ -11,11 +12,12 @@ export DOTFILES=$HOME/.dotfiles
 export ZSH="${OH_MY_ZSH:-$HOME/.oh-my-zsh}"
 
 
-autoload -U promptinit; promptinit
-zstyle ':prompt:pure:path' color cyan
-zstyle ':prompt:pure:virtualenv' color 242
-zstyle ':prompt:pure:environment' render true
-prompt pure
+# autoload -U promptinit; promptinit
+# zstyle ':prompt:pure:path' color cyan
+# zstyle ':prompt:pure:virtualenv' color 242
+# zstyle ':prompt:pure:environment' render true
+# prompt pure
+
 
 ZSH_THEME=""
 
@@ -27,8 +29,8 @@ plugins=(colorize compleat dirpersist autojump git history cp)
 
 source $ZSH/oh-my-zsh.sh
 
-# direnv hook
-eval "$(direnv hook zsh)"
+# direnv hook (disabled in favor of envy)
+# eval "$(direnv hook zsh)"
 
 export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
@@ -123,3 +125,17 @@ source ~/Scripts/dotfiles/ALIASES.sh
 
 # Added by Antigravity
 export PATH="/Users/maximilianoflorentin/.antigravity/antigravity/bin:$PATH"
+
+# KS (Keychain Secrets) - Basic commands available via ALIASES.sh
+# For automated secret loading, see: ~/projects/dotfiles/scripts/envy/
+
+# Initialize Starship
+export STARSHIP_CONFIG="$DOTFILES/starship.toml"
+eval "$(starship init zsh)"
+
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f '/Users/maximilianoflorentin/projects/gcp/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/maximilianoflorentin/projects/gcp/google-cloud-sdk/path.zsh.inc'; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f '/Users/maximilianoflorentin/projects/gcp/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/maximilianoflorentin/projects/gcp/google-cloud-sdk/completion.zsh.inc'; fi

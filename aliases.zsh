@@ -57,3 +57,8 @@ alias unstage="git restore --staged ."
 alias wip="commit wip"
 
 alias jira-ticket="pbpaste | jira-create"
+
+# Claude
+alias clau='claude -c'
+alias xam='claude -c -p "/xam"'
+alias xamn='claude -p "/xam"'
