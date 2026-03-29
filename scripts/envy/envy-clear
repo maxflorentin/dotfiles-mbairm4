@@ -14,7 +14,7 @@ if [ -z "$1" ]; then
     echo "⚠️  WARNING: This will delete ALL secrets in the context!"
     echo ""
     echo "Example:"
-    echo "  envy-clear yuno"
+    echo "  envy-clear work"
     exit 1
 fi
 

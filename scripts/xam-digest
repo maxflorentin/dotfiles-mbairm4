@@ -1,7 +1,7 @@
 #!/bin/bash
 # xam-digest: Run Xam Slack digest in a new terminal tab
 # Usage: xam-digest [am|noon|pm]
-# Scheduled via cron: 0 9,12,16 * * 1-5 /Users/maximilianoflorentin/Scripts/dotfiles/xam-digest
+# Scheduled via cron: 0 9,12,16 * * 1-5 ~/Scripts/dotfiles/xam-digest
 
 set -euo pipefail
 
@@ -29,7 +29,7 @@ tell application \"iTerm2\"
   tell current window
     create tab with default profile
     tell current session
-      write text \"cd /Users/maximilianoflorentin/projects/dotfiles && claude -p '/xam ${PROMPT}'\"
+      write text \"cd $HOME/Projects/dotfiles && claude -p '/xam ${PROMPT}'\"
     end tell
   end tell
 end tell

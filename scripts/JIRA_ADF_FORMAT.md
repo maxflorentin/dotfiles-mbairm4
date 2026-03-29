@@ -206,10 +206,10 @@ Panel types: `info`, `note`, `warning`, `error`, `success`
       "type": "paragraph",
       "content": [
         {"type": "text", "text": "The "},
-        {"type": "text", "text": "audit-logs-ms", "marks": [{"type": "code"}]},
+        {"type": "text", "text": "my-service", "marks": [{"type": "code"}]},
         {"type": "text", "text": " service needs "},
         {"type": "text", "text": "read permissions", "marks": [{"type": "strong"}]},
-        {"type": "text", "text": " on StarRocks."}
+        {"type": "text", "text": " on the database."}
       ]
     },
     {
@@ -243,7 +243,7 @@ Panel types: `info`, `note`, `warning`, `error`, `success`
       "type": "codeBlock",
       "attrs": {"language": "sql"},
       "content": [
-        {"type": "text", "text": "GRANT SELECT ON DATABASE audit_logs TO ROLE 'audit_reader';"}
+        {"type": "text", "text": "GRANT SELECT ON DATABASE my_db TO ROLE 'reader_role';"}
       ]
     },
     {

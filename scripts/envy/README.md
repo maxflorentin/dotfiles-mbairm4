@@ -1,14 +1,6 @@
-# Envy - Simple Encrypted Environment Manager
+# Envy - Encrypted Environment Manager
 
-Modern replacement for ks-lazy with clean, simple secret management.
-
-## Features
-
-- 🔐 **Age encryption** - Military-grade encryption for your secrets
-- 🎯 **Multiple contexts** - Separate environments (personal, work, projects)
-- 🚀 **Zero startup delay** - No background jobs or subshells
-- 🧹 **Clean integration** - Simple key=value syntax
-- 🔄 **Easy migration** - Import from ks with one command
+Simple, fast secret management using [age](https://github.com/FiloSottile/age) encryption.
 
 ## Structure
 
@@ -16,104 +8,87 @@ Modern replacement for ks-lazy with clean, simple secret management.
 ~/.envy/
 ├── keys/
 │   ├── personal.key      # Age keys (NEVER commit these)
-│   └── yuno.key
+│   └── work.key
 ├── personal.envy.age     # Encrypted secrets
-├── yuno.envy.age
+├── work.envy.age
 └── config                # Current context
-```
-
-## Installation
-
-```bash
-# 1. Install age encryption
-brew install age
-
-# 2. Initialize envy
-envy-init
-
-# 3. Create a context
-envy-new personal
-
-# 4. Add secrets
-envy-set GITHUB_TOKEN "ghp_xxx..."
-envy-set OPENAI_API_KEY "sk-xxx..."
-
-# 5. Load context (exports variables to current shell)
-envy-load personal
 ```
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `envy-init` | Initialize envy (install dependencies, create structure) |
-| `envy-new <context>` | Create new context with encryption key |
-| `envy-set <KEY> <value>` | Add/update secret in current context |
-| `envy-get <KEY>` | Get secret from current context |
-| `envy-load <context>` | Load context (export all variables) |
-| `envy-list` | List all contexts and variables |
-| `envy-edit` | Edit current context (opens in $EDITOR) |
-| `envy-switch <context>` | Switch to different context |
-| `envy-migrate-from-ks` | Import secrets from KS |
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `envy-load <context>` | `evl` | Load context (export all variables) |
+| `envy-set <KEY> <value>` | `evs` | Add/update secret in current context |
+| `envy-get <KEY>` | `evg` | Get secret from current context |
+| `envy-list` | `ev` | List all contexts and variables |
+| `envy-switch <context>` | `evsw` | Switch to different context |
+| `envy-rm <KEY>` | `evrm` | Remove a secret |
+| `envy-new <context>` | | Create new context with encryption key |
+| `envy-edit` | | Edit current context in $EDITOR |
+| `envy-clear <context>` | | Remove ALL secrets from a context |
+| `envy-rename-context` | | Rename a context |
 
-## Usage Examples
+## Scopes
+
+Envy supports multiple contexts (scopes) for organizing secrets:
+
+- **personal** - Personal tokens (GitHub, OpenAI, etc.)
+- **work** - Work-related secrets
+- **\<project\>** - Per-project secrets (any name)
+
+### Auto-detect by directory
+
+Place a `.envy-context` file in your project root:
 
 ```bash
-# Create work context
-envy-new yuno
-envy-set KINGDOM_TOKEN "xxx"
-envy-set DD_API_KEY "xxx"
-envy-set DD_APP_KEY "xxx"
+echo "myproject" > ~/projects/myapp/.envy-context
+```
 
-# Switch contexts
-envy-load yuno        # Load work secrets
-envy-load personal    # Switch to personal
+Now `envy-load` (or `evl`) without arguments will automatically detect the context when you're inside that directory. It walks up parent directories until it finds `.envy-context`, then falls back to `~/.envy/config`.
 
-# Check what's loaded
+## Usage
+
+```bash
+# Create contexts
+envy-new personal
+envy-new work
+
+# Add secrets
+envy-switch work
+envy-set API_KEY "xxx"
+envy-set SECRET_KEY "xxx"
+
+# Load in current shell
+eval "$(envy-load work --export)"
+
+# List everything
 envy-list
 
 # Edit secrets manually
 envy-edit
 ```
 
-## Migration from KS
+## Shell Integration
+
+Already configured via `aliases.zsh`. To auto-load on shell start, add to `~/.zshrc`:
 
 ```bash
-# Automatic migration
-envy-migrate-from-ks personal GITHUB_TOKEN
-envy-migrate-from-ks yuno KINGDOM_TOKEN DD_API_KEY DD_APP_KEY
-
-# Verify
-envy-load personal
-echo $GITHUB_TOKEN
-```
-
-## Integration with .zshrc
-
-Add to your `~/.zshrc`:
-
-```bash
-# Load default envy context
-ENVY_DEFAULT_CONTEXT="personal"
 if command -v envy-load &> /dev/null; then
-    eval "$(envy-load $ENVY_DEFAULT_CONTEXT --export)"
+    eval "$(envy-load personal --export 2>/dev/null)"
 fi
 ```
 
-## Security Notes
+## iCloud Sync
 
-- **Keys are stored in `~/.envy/keys/`** - Keep these safe!
-- **Never commit `.key` files** - Add to `.gitignore`
-- **Encrypted files (.envy.age)** - Safe to backup/sync
-- **Use strong passphrases** - Consider using age with passphrase encryption
+```bash
+envy-setup-icloud
+```
 
-## vs KS (Keychain Secrets)
+Moves `~/.envy` to iCloud Drive with a symlink for compatibility.
 
-| Feature | envy | ks |
-|---------|------|-----|
-| Encryption | age (file-based) | macOS Keychain |
-| Startup time | Instant | Background jobs |
-| Password prompts | Once per key | Frequent |
-| Cross-platform | Yes | macOS only |
-| Backup | Easy (encrypted files) | iCloud sync |
-| Simplicity | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+## Security
+
+- **Keys** (`~/.envy/keys/`) - NEVER commit or share
+- **Encrypted files** (`.envy.age`) - Safe to backup/sync
+- Age uses ChaCha20-Poly1305 with 256-bit keys

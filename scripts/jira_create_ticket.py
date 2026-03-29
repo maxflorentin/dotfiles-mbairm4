@@ -97,8 +97,11 @@ def create_issue(payload):
     if "fields" not in payload:
         payload["fields"] = {}
 
-    if "customfield_12041" not in payload["fields"]:
-        payload["fields"]["customfield_12041"] = [{"value": "All Customers"}]
+    # Apply default custom fields from environment
+    default_field = os.getenv("JIRA_DEFAULT_CUSTOM_FIELD")
+    default_value = os.getenv("JIRA_DEFAULT_CUSTOM_VALUE")
+    if default_field and default_field not in payload["fields"]:
+        payload["fields"][default_field] = [{"value": default_value or "All"}]
 
     country_field = os.getenv("JIRA_COUNTRY_FIELD")
     if country_field and country_field not in payload["fields"]:

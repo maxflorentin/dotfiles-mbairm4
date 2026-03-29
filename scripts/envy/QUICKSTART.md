@@ -1,83 +1,57 @@
 # Envy - Quick Start
 
-## 5 Minutos para Empezar
-
-### 1️⃣ Ya está inicializado! ✅
+## Setup
 
 ```bash
-ls ~/.envy
-# Deberías ver: keys/, config, README.md, .gitignore
+# Initialize (one-time)
+envy-init
+
+# Create your contexts
+envy-new personal
+envy-new work
 ```
 
-### 2️⃣ Crear tu primer contexto
+## Add Secrets
 
 ```bash
-cd ~/projects/dotfiles/scripts/envy
-./envy-new personal
+envy-switch work
+envy-set API_KEY "xxx"
+envy-set SECRET_KEY "xxx"
+
+# Or bulk add from clipboard
+envy-add-from-clipboard work API_KEY SECRET_KEY
 ```
 
-### 3️⃣ Migrar tus secretos de KS
+## Load Secrets
 
 ```bash
-# Personal
-./envy-migrate-from-ks personal GITHUB_TOKEN
+# See what would load
+envy-load work
 
-# Trabajo
-./envy-migrate-from-ks yuno KINGDOM_TOKEN DD_API_KEY DD_APP_KEY REDASH_API_KEY
+# Actually export to shell
+eval "$(envy-load work --export)"
+
+# Verify
+echo $API_KEY
 ```
 
-### 4️⃣ Cargar en tu shell
+## Per-project Auto-detect
 
 ```bash
-# Ver qué hay
-./envy-list
+# In any project directory
+echo "myproject" > .envy-context
 
-# Cargar en shell actual
-eval "$(./envy-load personal --export)"
-
-# Verificar
-echo $GITHUB_TOKEN
+# Now just run (no args needed)
+eval "$(envy-load --export)"
 ```
 
-### 5️⃣ Auto-load en futuras sesiones
-
-Agregar a `~/.zshrc`:
+## Aliases
 
 ```bash
-# Envy auto-load
-if [ -f "$HOME/projects/dotfiles/scripts/envy/envy-load" ]; then
-    eval "$($HOME/projects/dotfiles/scripts/envy/envy-load personal --export 2>/dev/null)"
-fi
+ev          # envy-list
+evl         # envy-load
+evs         # envy-set
+evg         # envy-get
+evrm        # envy-rm
+evsw        # envy-switch
 ```
-
-## 🎉 Listo!
-
-- ✅ Sin subshells molestos
-- ✅ Sin prompts de contraseña
-- ✅ Carga instantánea
-- ✅ Archivos encriptados
-- ✅ Multi-contexto
-
-## Comandos más usados
-
-```bash
-cd ~/projects/dotfiles/scripts/envy
-
-./envy-list                              # Ver todo
-./envy-list personal                     # Ver contexto específico
-./envy-set API_KEY "xxx"                 # Agregar secreto
-eval "$(./envy-load yuno --export)"      # Cargar contexto
-./envy-edit                              # Editar manualmente
-```
-
-## Próximos pasos
-
-- Lee `MIGRATION.md` para detalles completos
-- Lee `README.md` para documentación extensa
-- Configura auto-load en `.zshrc`
-- Backup de tus keys (password manager!)
-
----
-
-**Nota**: Los comandos ya están en PATH después de `source ~/.zshrc`.
-Puedes usar `envy-list` directamente sin el `./`

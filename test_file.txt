@@ -1,2 +1,0 @@
-secret_from_file_1
-secret_from_file_2

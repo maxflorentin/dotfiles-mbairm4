@@ -1,7 +1,7 @@
 {
   "fields": {
     "project": {
-      "key": "ANA"
+      "key": "PROJ"
     },
     "summary": "Complete ticket title - Brief and descriptive",
     "description": {
@@ -88,7 +88,7 @@
       "infrastructure",
       "permissions",
       "automation",
-      "starrocks"
+      "analytics"
     ],
     "components": [
       {"name": "Backend"},
@@ -120,10 +120,7 @@
         }
       ]
     },
-    "customfield_12041": "All Customers",
-    "customfield_10000": null,
-    "customfield_10001": null,
-    "customfield_10002": null
+    "customfield_XXXXX": "Custom field value"
   },
   "update": {
     "worklog": [

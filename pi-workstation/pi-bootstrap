@@ -1,0 +1,169 @@
+#!/bin/bash
+
+# pi-bootstrap: Set up Raspberry Pi 400 as isolated freelance dev server
+# Run this ON the Pi after fresh Raspberry Pi OS Lite (64-bit) install
+# Usage: curl -sL <raw-url> | bash  OR  scp this file to Pi and run it
+
+set -e
+
+echo "=== Pi 400 Dev Server Bootstrap ==="
+echo ""
+
+# Fail if not on ARM64
+if [ "$(uname -m)" != "aarch64" ]; then
+    echo "This script is for Raspberry Pi (aarch64). Aborting."
+    exit 1
+fi
+
+# Update system
+echo "[1/8] Updating system..."
+sudo apt-get update -qq && sudo apt-get upgrade -y -qq
+
+# Core tools
+echo "[2/8] Installing core packages..."
+sudo apt-get install -y -qq \
+    git curl wget unzip \
+    build-essential cmake \
+    tmux htop \
+    openssh-server \
+    wireguard openresolv \
+    age \
+    jq ripgrep fd-find bat fzf \
+    zsh
+
+# Docker (lightweight, CE for ARM)
+echo "[3/8] Installing Docker..."
+if ! command -v docker &>/dev/null; then
+    curl -fsSL https://get.docker.com | sh
+    sudo usermod -aG docker "$USER"
+fi
+
+# Node via fnm (fast, low overhead)
+echo "[4/8] Installing Node (via fnm)..."
+if ! command -v fnm &>/dev/null; then
+    curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
+    export PATH="$HOME/.local/share/fnm:$PATH"
+    eval "$(fnm env)"
+    fnm install --lts
+fi
+
+# Python (system python3 + uv)
+echo "[5/8] Installing Python tools..."
+if ! command -v uv &>/dev/null; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
+
+# Neovim (latest stable from GitHub releases)
+echo "[6/8] Installing Neovim..."
+if ! command -v nvim &>/dev/null; then
+    NVIM_VERSION="v0.11.6"
+    curl -LO "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-arm64.tar.gz"
+    sudo tar xzf nvim-linux-arm64.tar.gz -C /opt/
+    sudo ln -sf /opt/nvim-linux-arm64/bin/nvim /usr/local/bin/nvim
+    rm nvim-linux-arm64.tar.gz
+fi
+
+# Starship prompt
+echo "[7/8] Installing Starship..."
+if ! command -v starship &>/dev/null; then
+    curl -sS https://starship.rs/install.sh | sh -s -- -y
+fi
+
+# Envy (age-encrypted secrets)
+echo "[8/8] Setting up envy + dotfiles..."
+
+# Clone dotfiles
+DOTFILES_DIR="$HOME/dotfiles"
+if [ ! -d "$DOTFILES_DIR" ]; then
+    git clone https://github.com/maxflorentin/dotfiles.git "$DOTFILES_DIR"
+fi
+
+# Link envy scripts
+mkdir -p "$HOME/.local/bin"
+for script in "$DOTFILES_DIR/scripts/envy"/envy-*; do
+    name=$(basename "$script")
+    ln -sf "$script" "$HOME/.local/bin/$name"
+done
+
+# Link nvim config
+mkdir -p "$HOME/.config"
+ln -sf "$DOTFILES_DIR/nvim/config" "$HOME/.config/nvim"
+
+# Set up zsh as default shell
+if [ "$SHELL" != "$(which zsh)" ]; then
+    chsh -s "$(which zsh)"
+fi
+
+# Create minimal .zshrc for Pi
+cat > "$HOME/.zshrc" << 'ZSHRC'
+# History
+HISTFILE=~/.zsh_history
+HISTSIZE=50000
+SAVEHIST=50000
+setopt EXTENDED_HISTORY SHARE_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS
+
+# Directory navigation
+setopt AUTO_CD AUTO_PUSHD PUSHD_IGNORE_DUPS PUSHD_SILENT
+
+# Completion
+autoload -Uz compinit && compinit -C
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+
+# Vi mode
+bindkey -v
+
+# Environment
+export EDITOR="nvim"
+export PATH="$HOME/.local/bin:$HOME/.local/share/fnm:$PATH"
+
+# fnm (Node version manager)
+command -v fnm &>/dev/null && eval "$(fnm env)"
+
+# Aliases
+alias vim=nvim
+alias k=kubectl
+alias docker=podman 2>/dev/null || true
+alias gs="git status"
+alias gb="git branch"
+alias gc="git checkout"
+alias gl="git log --oneline --decorate --color"
+alias gd="git diff"
+alias push="git push"
+alias pull="git pull"
+alias ev='envy-list'
+alias evl='envy-load'
+alias evs='envy-set'
+alias evg='envy-get'
+
+# Starship
+eval "$(starship init zsh)"
+ZSHRC
+
+# Create clients directory structure
+mkdir -p "$HOME/clients"
+
+# Create tmux config
+cat > "$HOME/.tmux.conf" << 'TMUX'
+set -g default-terminal "screen-256color"
+set -ga terminal-overrides ",xterm-256color:Tc"
+set -g mouse on
+set -g history-limit 50000
+set -g base-index 1
+setw -g pane-base-index 1
+set -g status-style 'bg=default fg=white'
+set -g status-right '#(cat ~/.envy/config 2>/dev/null || echo "no-ctx") | %H:%M'
+set -g status-left '[#S] '
+set -s escape-time 0
+TMUX
+
+echo ""
+echo "=== Bootstrap complete ==="
+echo ""
+echo "Next steps:"
+echo "  1. Log out and back in (or: exec zsh)"
+echo "  2. Initialize envy: envy-init && envy-new work"
+echo "  3. From your Mac: work connect"
+echo ""
+echo "Clients dir: ~/clients/"
+echo "Dotfiles: ~/dotfiles/"

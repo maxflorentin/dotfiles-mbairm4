@@ -1,6 +1,6 @@
 #!/bin/bash
 # brew-sync: Dump current brew state to Brewfile and commit if changed
-# Scheduled via cron: 0 20 * * * /Users/maximilianoflorentin/Scripts/dotfiles/brew-sync
+# Scheduled via cron: 0 20 * * * ~/Scripts/dotfiles/brew-sync
 
 set -euo pipefail
 

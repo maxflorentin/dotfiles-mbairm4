@@ -61,7 +61,7 @@ def main():
         json.dump(all_fields, f, indent=2)
     print(f"✓ General fields saved to: jira_all_fields.json ({len(all_fields)} fields)\n")
 
-    project_key = "ANA"
+    project_key = os.getenv("JIRA_PROJECT_KEY", "PROJ")
     metadata = get_project_metadata(project_key)
     with open("jira_project_metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)

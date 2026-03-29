@@ -25,7 +25,19 @@ for arg in "$@"; do
 done
 
 if [ -z "${CONTEXT}" ]; then
-    # Use current context if not specified
+    # Auto-detect: walk up from current dir looking for .envy-context
+    _dir="$PWD"
+    while [ "$_dir" != "/" ]; do
+        if [ -f "$_dir/.envy-context" ]; then
+            CONTEXT=$(cat "$_dir/.envy-context")
+            break
+        fi
+        _dir=$(dirname "$_dir")
+    done
+fi
+
+if [ -z "${CONTEXT}" ]; then
+    # Fallback to global config
     if [ -f "${ENVY_CONFIG}" ]; then
         CONTEXT=$(cat "${ENVY_CONFIG}")
     else
@@ -85,7 +97,7 @@ else
         # Extract key name (before =)
         KEY="${line%%=*}"
         echo "  ✓ ${KEY}"
-        ((COUNT++))
+        COUNT=$((COUNT + 1))
     done <<< "${DECRYPTED}"
 
     echo ""

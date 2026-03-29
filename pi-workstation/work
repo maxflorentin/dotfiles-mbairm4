@@ -1,0 +1,187 @@
+#!/bin/bash
+
+# work: Manage freelance workspaces on Raspberry Pi 400
+# Usage: work <command> [args]
+
+set -e
+
+PI_HOST="${WORK_PI_HOST:-pi-workstation}"
+PI_USER="${WORK_PI_USER:-max}"
+CLIENTS_DIR="clients"
+
+_ssh() {
+    ssh -t "$PI_USER@$PI_HOST" "$@"
+}
+
+_ssh_quiet() {
+    ssh -o ConnectTimeout=3 "$PI_USER@$PI_HOST" "$@" 2>/dev/null
+}
+
+cmd_connect() {
+    local client="${1:-}"
+    local session
+
+    if [ -n "$client" ]; then
+        session="$client"
+        # Attach or create tmux session in client dir
+        _ssh "tmux has-session -t '$session' 2>/dev/null && tmux attach -t '$session' || (cd ~/$CLIENTS_DIR/$client 2>/dev/null && tmux new -s '$session' || tmux new -s '$session')"
+    else
+        # Attach to any existing session or create default
+        _ssh "tmux attach 2>/dev/null || tmux new -s main"
+    fi
+}
+
+cmd_setup() {
+    local client="$1"
+    if [ -z "$client" ]; then
+        echo "Usage: work setup <client-name>"
+        echo ""
+        echo "Creates project structure + envy context on Pi"
+        exit 1
+    fi
+
+    echo "Setting up workspace for: $client"
+    echo ""
+
+    # Create directory structure on Pi
+    _ssh "mkdir -p ~/$CLIENTS_DIR/$client && echo '$client' > ~/$CLIENTS_DIR/$client/.envy-context"
+
+    # Create envy context if it doesn't exist
+    _ssh "test -f ~/.envy/keys/$client.key || envy-new $client"
+
+    echo "Workspace ready: ~/$CLIENTS_DIR/$client/"
+    echo "Envy context: $client"
+    echo ""
+    echo "Connect with: work connect $client"
+}
+
+cmd_vpn_up() {
+    local client="$1"
+    if [ -z "$client" ]; then
+        echo "Usage: work vpn-up <client-name>"
+        echo "Starts WireGuard VPN for client (config must exist at /etc/wireguard/<client>.conf)"
+        exit 1
+    fi
+
+    echo "Starting VPN for $client..."
+    _ssh "sudo wg-quick up $client"
+    echo "VPN active. Check with: work status"
+}
+
+cmd_vpn_down() {
+    local client="$1"
+    if [ -z "$client" ]; then
+        echo "Usage: work vpn-down <client-name>"
+        exit 1
+    fi
+
+    _ssh "sudo wg-quick down $client" 2>/dev/null || true
+    echo "VPN stopped for $client"
+}
+
+cmd_status() {
+    echo "=== Pi Status ==="
+    echo ""
+
+    # Check connectivity
+    if ! _ssh_quiet "echo ok" >/dev/null; then
+        echo "Pi is offline or unreachable at $PI_HOST"
+        exit 1
+    fi
+
+    _ssh "
+        echo 'Host: $(hostname)'
+        echo 'Uptime:$(uptime -p 2>/dev/null || uptime | sed 's/.*up//')'
+        echo ''
+
+        echo 'Memory:'
+        free -h | grep Mem | awk '{printf \"  Used: %s / %s (free: %s)\n\", \$3, \$2, \$4}'
+        echo ''
+
+        echo 'Docker:'
+        docker ps --format '  {{.Names}}: {{.Status}}' 2>/dev/null || echo '  (not running)'
+        echo ''
+
+        echo 'VPN:'
+        sudo wg show 2>/dev/null | grep 'interface' | awk '{print \"  \" \$2 \": active\"}' || echo '  (none active)'
+        echo ''
+
+        echo 'Tmux sessions:'
+        tmux list-sessions 2>/dev/null | sed 's/^/  /' || echo '  (none)'
+        echo ''
+
+        echo 'Clients:'
+        ls -1 ~/clients/ 2>/dev/null | sed 's/^/  /' || echo '  (none)'
+    "
+}
+
+cmd_sync() {
+    local client="$1"
+    local dir="${2:-.}"
+
+    if [ -z "$client" ]; then
+        echo "Usage: work sync <client-name> [local-dir]"
+        echo "Syncs local dir to Pi client workspace"
+        exit 1
+    fi
+
+    rsync -avz --exclude '.git' --exclude 'node_modules' --exclude '.venv' --exclude '__pycache__' \
+        "$dir/" "$PI_USER@$PI_HOST:~/$CLIENTS_DIR/$client/"
+    echo "Synced to Pi:~/$CLIENTS_DIR/$client/"
+}
+
+cmd_destroy() {
+    local client="$1"
+    if [ -z "$client" ]; then
+        echo "Usage: work destroy <client-name>"
+        exit 1
+    fi
+
+    echo "This will delete ALL data for client '$client' on Pi:"
+    echo "  - ~/$CLIENTS_DIR/$client/"
+    echo "  - envy context '$client'"
+    echo "  - VPN config (if exists)"
+    echo ""
+    read -p "Type 'yes' to confirm: " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "Aborted."
+        exit 0
+    fi
+
+    _ssh "
+        rm -rf ~/$CLIENTS_DIR/$client
+        rm -f ~/.envy/$client.envy.age ~/.envy/keys/$client.key
+        sudo rm -f /etc/wireguard/$client.conf
+        tmux kill-session -t $client 2>/dev/null || true
+    "
+
+    echo "Workspace '$client' destroyed."
+}
+
+cmd_help() {
+    echo "work - Manage freelance workspaces on Pi"
+    echo ""
+    echo "Commands:"
+    echo "  work connect [client]     SSH + tmux (optional client session)"
+    echo "  work setup <client>       Create new client workspace"
+    echo "  work status               Show Pi status, VPNs, sessions"
+    echo "  work sync <client> [dir]  Rsync local dir to Pi"
+    echo "  work vpn-up <client>      Start client VPN"
+    echo "  work vpn-down <client>    Stop client VPN"
+    echo "  work destroy <client>     Delete all client data"
+    echo ""
+    echo "Config (env vars):"
+    echo "  WORK_PI_HOST  Pi hostname (default: pi.local)"
+    echo "  WORK_PI_USER  Pi username (default: max)"
+}
+
+case "${1:-}" in
+    connect)  shift; cmd_connect "$@" ;;
+    setup)    shift; cmd_setup "$@" ;;
+    status)   cmd_status ;;
+    sync)     shift; cmd_sync "$@" ;;
+    vpn-up)   shift; cmd_vpn_up "$@" ;;
+    vpn-down) shift; cmd_vpn_down "$@" ;;
+    destroy)  shift; cmd_destroy "$@" ;;
+    *)        cmd_help ;;
+esac

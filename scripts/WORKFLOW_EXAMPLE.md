@@ -29,9 +29,9 @@ Ask GEM to generate a complete JSON using the template:
 Using this Jira ticket template (see jira_full_template.json),
 generate a JSON for a ticket with:
 
-Title: "Add read permissions for audit-logs-ms on StarRocks"
+Title: "Add read permissions for my-service on the database"
 Priority: High
-Labels: starrocks, permissions, infrastructure
+Labels: analytics, permissions, infrastructure
 
 Description should include:
 - Overview of the request
@@ -56,7 +56,7 @@ Ask GEM to generate markdown first (easier for GEM):
 **Prompt to GEM:**
 ```
 Write a detailed markdown description for a Jira ticket about
-granting StarRocks read permissions to audit-logs-ms service
+granting database read permissions to my-service
 across DEV/Staging/Production environments.
 
 Include:
@@ -102,7 +102,7 @@ make jira-create FILE=manual_ticket.json
 ```
 Generate a Jira ticket JSON with these specifications:
 
-Project: ANA
+Project: PROJ
 Issue Type: Task
 Priority: High
 Summary: [Your title]
@@ -156,15 +156,15 @@ command here
 ```
 Create a Jira ticket JSON for:
 
-Project: ANA
-Title: "Configure StarRocks permissions for audit-logs-ms microservice"
+Project: PROJ
+Title: "Configure database permissions for my-service"
 Priority: High
-Labels: starrocks, permissions, audit-logs, infrastructure
+Labels: analytics, permissions, infrastructure
 
 Description:
 ## Overview
-The audit-logs-ms microservice requires read-only access to the audit_logs
-database in StarRocks across all environments.
+The my-service microservice requires read-only access to the analytics
+database across all environments.
 
 ## Environments
 - Development (DEV)
@@ -173,13 +173,13 @@ database in StarRocks across all environments.
 
 ## Required Grants
 ```sql
-GRANT SELECT ON DATABASE audit_logs TO ROLE 'audit_reader';
-GRANT ROLE 'audit_reader' TO USER 'audit-logs-ms'@'%';
+GRANT SELECT ON DATABASE my_db TO ROLE 'reader_role';
+GRANT ROLE 'reader_role' TO USER 'my-service'@'%';
 ```
 
 ## Security Considerations
 - Read-only access (no INSERT/UPDATE/DELETE)
-- Scoped to audit_logs database only
+- Scoped to my_db database only
 - Requires DBA approval
 
 Use proper Jira ADF format.
@@ -190,7 +190,7 @@ Use proper Jira ADF format.
 **Create ticket:**
 ```bash
 python jira_create_ticket.py ticket.json
-# Output: ✓ Ticket created: https://your-domain.atlassian.net/browse/ANA-1234
+# Output: ✓ Ticket created: https://your-domain.atlassian.net/browse/PROJ-1234
 ```
 
 ## Automation Scripts

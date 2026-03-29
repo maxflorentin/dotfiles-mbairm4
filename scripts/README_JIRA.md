@@ -60,7 +60,7 @@ Use `jira_ticket_template.json` as base. Common fields:
 ```json
 {
   "fields": {
-    "project": {"key": "ANA"},
+    "project": {"key": "PROJ"},
     "summary": "Ticket title",
     "description": {
       "type": "doc",
