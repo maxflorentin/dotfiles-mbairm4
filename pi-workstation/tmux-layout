@@ -1,22 +1,50 @@
 #!/bin/bash
 
 # tmux-layout: Create a workspace layout for a client session
-# Called by: work connect <client>
+# Usage: tmux-layout <client> [project]
+#   client  - client name (e.g. mutt)
+#   project - fuzzy project name (e.g. "cdc" matches "spark-cdc")
 
 set -e
 
 SESSION="$1"
+PROJECT="${2:-}"
 CLIENT_DIR="$HOME/clients/$SESSION"
+
+# Resolve project directory (fuzzy match)
+resolve_project_dir() {
+    local base="$1"
+    local query="$2"
+
+    # Exact match first
+    [ -d "$base/$query" ] && echo "$base/$query" && return
+
+    # Fuzzy: find dirs containing the query
+    local match
+    match=$(find "$base" -maxdepth 1 -type d -iname "*${query}*" 2>/dev/null | head -1)
+
+    if [ -n "$match" ]; then
+        echo "$match"
+    else
+        echo "$base"
+    fi
+}
+
+# Determine working directory
+if [ -n "$PROJECT" ]; then
+    WORK_DIR=$(resolve_project_dir "$CLIENT_DIR" "$PROJECT")
+    SESSION="${SESSION}/${PROJECT}"
+else
+    WORK_DIR="$CLIENT_DIR"
+fi
+
+[ ! -d "$WORK_DIR" ] && WORK_DIR="$HOME"
 
 # If session already exists, just attach
 if tmux has-session -t "$SESSION" 2>/dev/null; then
     tmux attach -t "$SESSION"
     exit 0
 fi
-
-# Create session in client dir (or home if no client dir)
-WORK_DIR="$CLIENT_DIR"
-[ ! -d "$WORK_DIR" ] && WORK_DIR="$HOME"
 
 # Window 1: workspace
 tmux new-session -d -s "$SESSION" -c "$WORK_DIR" -n "workspace"

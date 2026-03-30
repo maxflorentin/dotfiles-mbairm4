@@ -27,10 +27,15 @@ _ssh_quiet() {
 
 cmd_connect() {
     local client="${1:-}"
+    local project="${2:-}"
 
     if [ -n "$client" ]; then
         _validate_client_name "$client"
-        _ssh "~/dotfiles/pi-workstation/tmux-layout '$client'"
+        if [ -n "$project" ]; then
+            _ssh "~/dotfiles/pi-workstation/tmux-layout '$client' '$project'"
+        else
+            _ssh "~/dotfiles/pi-workstation/tmux-layout '$client'"
+        fi
     else
         _ssh "tmux attach 2>/dev/null || tmux new -s main"
     fi
