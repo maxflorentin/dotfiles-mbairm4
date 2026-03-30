@@ -15,12 +15,18 @@ if [ "$(uname -m)" != "aarch64" ]; then
     exit 1
 fi
 
+# Fix locale
+echo "[1/9] Configuring locale..."
+sudo locale-gen en_US.UTF-8
+sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
 # Update system
-echo "[1/8] Updating system..."
+echo "[2/9] Updating system..."
 sudo apt-get update -qq && sudo apt-get upgrade -y -qq
 
 # Core tools
-echo "[2/8] Installing core packages..."
+echo "[3/9] Installing core packages..."
 sudo apt-get install -y -qq \
     git curl wget unzip \
     build-essential cmake \
@@ -32,14 +38,14 @@ sudo apt-get install -y -qq \
     zsh
 
 # Docker (lightweight, CE for ARM)
-echo "[3/8] Installing Docker..."
+echo "[4/9] Installing Docker..."
 if ! command -v docker &>/dev/null; then
     curl -fsSL https://get.docker.com | sh
     sudo usermod -aG docker "$USER"
 fi
 
 # Node via fnm (fast, low overhead)
-echo "[4/8] Installing Node (via fnm)..."
+echo "[5/9] Installing Node (via fnm)..."
 if ! command -v fnm &>/dev/null; then
     curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
     export PATH="$HOME/.local/share/fnm:$PATH"
@@ -48,13 +54,13 @@ if ! command -v fnm &>/dev/null; then
 fi
 
 # Python (system python3 + uv)
-echo "[5/8] Installing Python tools..."
+echo "[6/9] Installing Python tools..."
 if ! command -v uv &>/dev/null; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
 
 # Neovim (latest stable from GitHub releases)
-echo "[6/8] Installing Neovim..."
+echo "[7/9] Installing Neovim..."
 if ! command -v nvim &>/dev/null; then
     NVIM_VERSION="v0.11.6"
     curl -LO "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-arm64.tar.gz"
@@ -64,13 +70,13 @@ if ! command -v nvim &>/dev/null; then
 fi
 
 # Starship prompt
-echo "[7/8] Installing Starship..."
+echo "[8/9] Installing Starship..."
 if ! command -v starship &>/dev/null; then
     curl -sS https://starship.rs/install.sh | sh -s -- -y
 fi
 
 # Envy (age-encrypted secrets)
-echo "[8/8] Setting up envy + dotfiles..."
+echo "[9/9] Setting up envy + dotfiles..."
 
 # Clone dotfiles
 DOTFILES_DIR="$HOME/dotfiles"

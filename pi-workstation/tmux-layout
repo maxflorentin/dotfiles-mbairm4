@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# tmux-layout: Create a workspace layout for a client session
+# Called by: work connect <client>
+
+set -e
+
+SESSION="$1"
+CLIENT_DIR="$HOME/clients/$SESSION"
+
+# If session already exists, just attach
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+    tmux attach -t "$SESSION"
+    exit 0
+fi
+
+# Create session in client dir (or home if no client dir)
+WORK_DIR="$CLIENT_DIR"
+[ ! -d "$WORK_DIR" ] && WORK_DIR="$HOME"
+
+# Window 1: workspace
+tmux new-session -d -s "$SESSION" -c "$WORK_DIR" -n "workspace"
+
+# Left pane: editor (65%)
+# Right-top pane: terminal (35%)
+tmux split-window -h -t "$SESSION:workspace" -c "$WORK_DIR" -l 35%
+
+# Right-bottom pane: git/logs
+tmux split-window -v -t "$SESSION:workspace.1" -c "$WORK_DIR" -l 40%
+tmux send-keys -t "$SESSION:workspace.2" "git status 2>/dev/null || echo 'No git repo'" Enter
+
+# Bottom status bar pane (small)
+tmux split-window -v -t "$SESSION:workspace.0" -c "$WORK_DIR" -l 4
+tmux send-keys -t "$SESSION:workspace.3" "watch -t -n5 'echo \"$(hostname) | RAM: $(free -h | awk \"/Mem/{printf \\\"%s/%s\\\", \\\$3, \\\$2}\") | Docker: $(docker ps -q 2>/dev/null | wc -l) containers | VPN: $(sudo wg show 2>/dev/null | grep -c interface || echo 0) active | $(date +%H:%M)\"'" Enter
+
+# Focus on the editor pane
+tmux select-pane -t "$SESSION:workspace.0"
+
+# Window 2: docker
+tmux new-window -t "$SESSION" -n "docker" -c "$WORK_DIR"
+tmux send-keys -t "$SESSION:docker" "docker ps 2>/dev/null || echo 'Docker not running'; echo '---'; echo 'Use: docker compose logs -f'" Enter
+
+# Window 3: htop
+tmux new-window -t "$SESSION" -n "htop" -c "$WORK_DIR"
+tmux send-keys -t "$SESSION:htop" "htop" Enter
+
+# Go back to workspace window
+tmux select-window -t "$SESSION:workspace"
+
+# Attach
+tmux attach -t "$SESSION"

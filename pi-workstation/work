@@ -9,6 +9,14 @@ PI_HOST="${WORK_PI_HOST:-pi-workstation}"
 PI_USER="${WORK_PI_USER:-max}"
 CLIENTS_DIR="clients"
 
+_validate_client_name() {
+    local name="$1"
+    if [[ ! "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "Error: client name must be alphanumeric (a-z, 0-9, -, _)"
+        exit 1
+    fi
+}
+
 _ssh() {
     ssh -t "$PI_USER@$PI_HOST" "$@"
 }
@@ -19,14 +27,11 @@ _ssh_quiet() {
 
 cmd_connect() {
     local client="${1:-}"
-    local session
 
     if [ -n "$client" ]; then
-        session="$client"
-        # Attach or create tmux session in client dir
-        _ssh "tmux has-session -t '$session' 2>/dev/null && tmux attach -t '$session' || (cd ~/$CLIENTS_DIR/$client 2>/dev/null && tmux new -s '$session' || tmux new -s '$session')"
+        _validate_client_name "$client"
+        _ssh "~/dotfiles/pi-workstation/tmux-layout '$client'"
     else
-        # Attach to any existing session or create default
         _ssh "tmux attach 2>/dev/null || tmux new -s main"
     fi
 }
@@ -40,6 +45,7 @@ cmd_setup() {
         exit 1
     fi
 
+    _validate_client_name "$client"
     echo "Setting up workspace for: $client"
     echo ""
 
@@ -63,6 +69,7 @@ cmd_vpn_up() {
         exit 1
     fi
 
+    _validate_client_name "$client"
     echo "Starting VPN for $client..."
     _ssh "sudo wg-quick up $client"
     echo "VPN active. Check with: work status"
@@ -75,6 +82,7 @@ cmd_vpn_down() {
         exit 1
     fi
 
+    _validate_client_name "$client"
     _ssh "sudo wg-quick down $client" 2>/dev/null || true
     echo "VPN stopped for $client"
 }
@@ -137,6 +145,7 @@ cmd_destroy() {
         exit 1
     fi
 
+    _validate_client_name "$client"
     echo "This will delete ALL data for client '$client' on Pi:"
     echo "  - ~/$CLIENTS_DIR/$client/"
     echo "  - envy context '$client'"
@@ -158,6 +167,45 @@ cmd_destroy() {
     echo "Workspace '$client' destroyed."
 }
 
+cmd_browse() {
+    local client="$1"
+    if [ -z "$client" ]; then
+        echo "Usage: work browse <client-name>"
+        echo "Opens isolated Chrome routed through Pi's network/VPN"
+        exit 1
+    fi
+
+    _validate_client_name "$client"
+    local proxy_port="${WORK_PROXY_PORT:-1080}"
+    local chrome_dir="$HOME/.chrome-clients/$client"
+
+    # Check if proxy is already running
+    if ! lsof -i ":$proxy_port" &>/dev/null; then
+        echo "Starting SOCKS proxy on port $proxy_port..."
+        ssh -D "$proxy_port" -N -f "$PI_USER@$PI_HOST"
+    fi
+
+    echo "Opening Chrome for client '$client'..."
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+        --proxy-server="socks5://localhost:$proxy_port" \
+        --user-data-dir="$chrome_dir" \
+        --no-first-run \
+        &>/dev/null &
+
+    echo "Chrome running with Pi network. Close Chrome and 'work browse-stop' when done."
+}
+
+cmd_browse_stop() {
+    local proxy_port="${WORK_PROXY_PORT:-1080}"
+    local pid=$(lsof -ti ":$proxy_port" 2>/dev/null)
+    if [ -n "$pid" ]; then
+        kill "$pid"
+        echo "SOCKS proxy stopped."
+    else
+        echo "No proxy running on port $proxy_port."
+    fi
+}
+
 cmd_help() {
     echo "work - Manage freelance workspaces on Pi"
     echo ""
@@ -166,22 +214,27 @@ cmd_help() {
     echo "  work setup <client>       Create new client workspace"
     echo "  work status               Show Pi status, VPNs, sessions"
     echo "  work sync <client> [dir]  Rsync local dir to Pi"
+    echo "  work browse <client>      Chrome isolated via Pi network"
+    echo "  work browse-stop          Stop the SOCKS proxy"
     echo "  work vpn-up <client>      Start client VPN"
     echo "  work vpn-down <client>    Stop client VPN"
     echo "  work destroy <client>     Delete all client data"
     echo ""
     echo "Config (env vars):"
-    echo "  WORK_PI_HOST  Pi hostname (default: pi.local)"
-    echo "  WORK_PI_USER  Pi username (default: max)"
+    echo "  WORK_PI_HOST   Pi hostname (default: pi-workstation)"
+    echo "  WORK_PI_USER   Pi username (default: max)"
+    echo "  WORK_PROXY_PORT  SOCKS proxy port (default: 1080)"
 }
 
 case "${1:-}" in
-    connect)  shift; cmd_connect "$@" ;;
-    setup)    shift; cmd_setup "$@" ;;
-    status)   cmd_status ;;
-    sync)     shift; cmd_sync "$@" ;;
-    vpn-up)   shift; cmd_vpn_up "$@" ;;
-    vpn-down) shift; cmd_vpn_down "$@" ;;
-    destroy)  shift; cmd_destroy "$@" ;;
-    *)        cmd_help ;;
+    connect)      shift; cmd_connect "$@" ;;
+    setup)        shift; cmd_setup "$@" ;;
+    status)       cmd_status ;;
+    sync)         shift; cmd_sync "$@" ;;
+    browse)       shift; cmd_browse "$@" ;;
+    browse-stop)  cmd_browse_stop ;;
+    vpn-up)       shift; cmd_vpn_up "$@" ;;
+    vpn-down)     shift; cmd_vpn_down "$@" ;;
+    destroy)      shift; cmd_destroy "$@" ;;
+    *)            cmd_help ;;
 esac
