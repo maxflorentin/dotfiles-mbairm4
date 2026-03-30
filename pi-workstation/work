@@ -211,13 +211,99 @@ cmd_browse_stop() {
     fi
 }
 
+cmd_health() {
+    local warn=""
+
+    # Connectivity
+    if ! _ssh_quiet "echo ok" >/dev/null; then
+        osascript -e 'display notification "Pi is OFFLINE" with title "work health" sound name "Basso"' 2>/dev/null
+        echo "OFFLINE - Pi unreachable at $PI_HOST"
+        exit 1
+    fi
+
+    # Gather metrics
+    local metrics
+    metrics=$(_ssh_quiet "
+        # RAM usage percentage
+        ram_pct=\$(free | awk '/Mem/{printf \"%.0f\", \$3/\$2*100}')
+        ram_used=\$(free -h | awk '/Mem/{print \$3}')
+        ram_total=\$(free -h | awk '/Mem/{print \$2}')
+
+        # Disk usage percentage
+        disk_pct=\$(df / | awk 'NR==2{gsub(/%/,\"\"); print \$5}')
+        disk_used=\$(df -h / | awk 'NR==2{print \$3}')
+        disk_total=\$(df -h / | awk 'NR==2{print \$2}')
+
+        # CPU temp
+        temp=\$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
+        temp_c=\$((temp / 1000))
+
+        # Load
+        load=\$(awk '{print \$1}' /proc/loadavg)
+
+        # Docker containers
+        docker_count=\$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')
+
+        # WireGuard
+        wg_count=\$(sudo wg show 2>/dev/null | grep -c 'interface' || echo 0)
+
+        # Uptime
+        up=\$(uptime -p 2>/dev/null | sed 's/up //')
+
+        echo \"ram_pct=\$ram_pct|ram=\${ram_used}/\${ram_total}|disk_pct=\$disk_pct|disk=\${disk_used}/\${disk_total}|temp=\${temp_c}|load=\$load|docker=\$docker_count|vpn=\$wg_count|up=\$up\"
+    ")
+
+    # Parse
+    local ram_pct=$(echo "$metrics" | cut -d'|' -f1 | cut -d'=' -f2)
+    local ram=$(echo "$metrics" | cut -d'|' -f2 | cut -d'=' -f2)
+    local disk_pct=$(echo "$metrics" | cut -d'|' -f3 | cut -d'=' -f2)
+    local disk=$(echo "$metrics" | cut -d'|' -f4 | cut -d'=' -f2)
+    local temp=$(echo "$metrics" | cut -d'|' -f5 | cut -d'=' -f2)
+    local load=$(echo "$metrics" | cut -d'|' -f6 | cut -d'=' -f2)
+    local docker=$(echo "$metrics" | cut -d'|' -f7 | cut -d'=' -f2)
+    local vpn=$(echo "$metrics" | cut -d'|' -f8 | cut -d'=' -f2)
+    local up=$(echo "$metrics" | cut -d'|' -f9 | cut -d'=' -f2)
+
+    # Alerts
+    [ "$ram_pct" -gt 85 ] 2>/dev/null && warn="${warn}RAM critical (${ram_pct}%) "
+    [ "$disk_pct" -gt 85 ] 2>/dev/null && warn="${warn}Disk critical (${disk_pct}%) "
+    [ "$temp" -gt 75 ] 2>/dev/null && warn="${warn}Temp high (${temp}C) "
+
+    # Output
+    echo "pi-workstation  up $up"
+    echo ""
+    echo "  RAM    ${ram} (${ram_pct}%)"
+    echo "  Disk   ${disk} (${disk_pct}%)"
+    echo "  Temp   ${temp}C"
+    echo "  Load   ${load}"
+    echo "  Docker ${docker} containers"
+    echo "  VPN    ${vpn} active"
+
+    if [ -n "$warn" ]; then
+        echo ""
+        echo "  WARN: $warn"
+        osascript -e "display notification \"$warn\" with title \"work health\" sound name \"Basso\"" 2>/dev/null
+    fi
+}
+
+cmd_watch() {
+    echo "Monitoring Pi (Ctrl+C to stop)..."
+    while true; do
+        clear
+        cmd_health
+        sleep "${1:-30}"
+    done
+}
+
 cmd_help() {
     echo "work - Manage freelance workspaces on Pi"
     echo ""
     echo "Commands:"
-    echo "  work connect [client]     SSH + tmux (optional client session)"
+    echo "  work connect [client] [project]  SSH + tmux (fuzzy project match)"
     echo "  work setup <client>       Create new client workspace"
     echo "  work status               Show Pi status, VPNs, sessions"
+    echo "  work health               Quick health check with alerts"
+    echo "  work watch [seconds]      Live monitor (default: 30s)"
     echo "  work sync <client> [dir]  Rsync local dir to Pi"
     echo "  work browse <client>      Chrome isolated via Pi network"
     echo "  work browse-stop          Stop the SOCKS proxy"
@@ -226,15 +312,17 @@ cmd_help() {
     echo "  work destroy <client>     Delete all client data"
     echo ""
     echo "Config (env vars):"
-    echo "  WORK_PI_HOST   Pi hostname (default: pi-workstation)"
-    echo "  WORK_PI_USER   Pi username (default: max)"
-    echo "  WORK_PROXY_PORT  SOCKS proxy port (default: 1080)"
+    echo "  WORK_PI_HOST      Pi hostname (default: pi-workstation)"
+    echo "  WORK_PI_USER      Pi username (default: max)"
+    echo "  WORK_PROXY_PORT   SOCKS proxy port (default: 1080)"
 }
 
 case "${1:-}" in
     connect)      shift; cmd_connect "$@" ;;
     setup)        shift; cmd_setup "$@" ;;
     status)       cmd_status ;;
+    health)       cmd_health ;;
+    watch)        shift; cmd_watch "$@" ;;
     sync)         shift; cmd_sync "$@" ;;
     browse)       shift; cmd_browse "$@" ;;
     browse-stop)  cmd_browse_stop ;;
