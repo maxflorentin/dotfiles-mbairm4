@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(ls:*)",
+      "WebSearch",
+      "WebFetch(domain:cship.dev)",
+      "Bash(curl:*)",
+      "Bash(~/.local/bin/cship:*)",
+      "Bash(echo:*)"
+    ]
+  }
+}
