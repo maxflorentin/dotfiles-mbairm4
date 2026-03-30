@@ -149,19 +149,8 @@ ZSHRC
 # Create clients directory structure
 mkdir -p "$HOME/clients"
 
-# Create tmux config
-cat > "$HOME/.tmux.conf" << 'TMUX'
-set -g default-terminal "screen-256color"
-set -ga terminal-overrides ",xterm-256color:Tc"
-set -g mouse on
-set -g history-limit 50000
-set -g base-index 1
-setw -g pane-base-index 1
-set -g status-style 'bg=default fg=white'
-set -g status-right '#(cat ~/.envy/config 2>/dev/null || echo "no-ctx") | %H:%M'
-set -g status-left '[#S] '
-set -s escape-time 0
-TMUX
+# Link tmux config from dotfiles
+ln -sf "$DOTFILES_DIR/pi-workstation/.tmux.conf" "$HOME/.tmux.conf"
 
 echo ""
 echo "=== Bootstrap complete ==="
