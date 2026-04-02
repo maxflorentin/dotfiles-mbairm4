@@ -75,6 +75,22 @@ cmd_vpn_up() {
     fi
 
     _validate_client_name "$client"
+
+    # Check for full tunnel (0.0.0.0/0) which would kill SSH
+    local allowed
+    allowed=$(_ssh_quiet "sudo grep -i 'AllowedIPs' /etc/wireguard/$client.conf 2>/dev/null")
+    if echo "$allowed" | grep -q '0\.0\.0\.0/0'; then
+        echo "WARNING: $client.conf routes ALL traffic (AllowedIPs = 0.0.0.0/0)"
+        echo "This will kill your SSH connection to the Pi."
+        echo ""
+        echo "Edit /etc/wireguard/$client.conf on the Pi and set AllowedIPs"
+        echo "to only the client's internal subnets. Example:"
+        echo "  AllowedIPs = 10.0.0.0/8, 172.16.0.0/12"
+        echo ""
+        read -p "Start anyway? (yes/no): " confirm
+        [ "$confirm" != "yes" ] && exit 0
+    fi
+
     echo "Starting VPN for $client..."
     _ssh "sudo wg-quick up $client"
     echo "VPN active. Check with: work status"

@@ -35,6 +35,16 @@ work destroy <client>            # Delete all client data
 3. Run `pi-bootstrap` on the server
 4. Add SSH config entry on your Mac
 
+## VS Code Remote
+
+Install the "Remote - SSH" extension. Connect via `Cmd+Shift+P` > "Remote-SSH: Connect to Host" > `pi-workstation`. Edits, terminal, and extensions run on the server.
+
+## Client VPNs
+
+Each client can have its own WireGuard config at `/etc/wireguard/<client>.conf`.
+
+`work vpn-up` checks for full-tunnel configs (`AllowedIPs = 0.0.0.0/0`) and warns before activation, since routing all traffic through the client VPN would kill your SSH session. Always use split tunneling — only route the client's internal subnets.
+
 ## Configuration
 
 | Variable | Default | Description |

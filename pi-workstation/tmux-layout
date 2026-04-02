@@ -40,6 +40,13 @@ fi
 
 [ ! -d "$WORK_DIR" ] && WORK_DIR="$HOME"
 
+# Client CLI profiles
+CLIENT_ENV=""
+CLIENT_ENV+="export AWS_PROFILE=$1; "
+CLIENT_ENV+="export CLOUDSDK_ACTIVE_CONFIG_NAME=$1; "
+CLIENT_ENV+="export DATABRICKS_CONFIG_PROFILE=$1; "
+CLIENT_ENV+="export KUBECONFIG=$CLIENT_DIR/.kube/config; "
+
 # If session already exists, just attach
 if tmux has-session -t "$SESSION" 2>/dev/null; then
     tmux attach -t "$SESSION"
@@ -48,21 +55,23 @@ fi
 
 # Window 1: workspace
 tmux new-session -d -s "$SESSION" -c "$WORK_DIR" -n "workspace"
+tmux send-keys -t "$SESSION:workspace" "$CLIENT_ENV clear" Enter
 
 # Left pane: editor (65%)
 # Right-top pane: terminal (35%)
 tmux split-window -h -t "$SESSION:workspace" -c "$WORK_DIR" -l 35%
+tmux send-keys -t "$SESSION:workspace.1" "$CLIENT_ENV clear" Enter
 
 # Right-bottom pane: git/logs
 tmux split-window -v -t "$SESSION:workspace.1" -c "$WORK_DIR" -l 40%
-tmux send-keys -t "$SESSION:workspace.2" "git status 2>/dev/null" Enter
+tmux send-keys -t "$SESSION:workspace.2" "${CLIENT_ENV}git status 2>/dev/null" Enter
 
 # Focus on the editor pane
 tmux select-pane -t "$SESSION:workspace.0"
 
 # Window 2: docker
 tmux new-window -t "$SESSION" -n "docker" -c "$WORK_DIR"
-tmux send-keys -t "$SESSION:docker" "docker ps 2>/dev/null || echo 'No containers running'" Enter
+tmux send-keys -t "$SESSION:docker" "${CLIENT_ENV}docker ps 2>/dev/null || echo 'No containers running'" Enter
 
 # Window 3: htop
 tmux new-window -t "$SESSION" -n "htop" -c "$WORK_DIR"
