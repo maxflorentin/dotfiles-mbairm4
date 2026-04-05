@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# gh-clone-org: Clone all repos from a GitHub org/user
+# Usage: gh-clone-org <org-or-url> [destination]
+#   gh-clone-org lahuen
+#   gh-clone-org https://github.com/lahuen
+#   gh-clone-org lahuen ~/clients/lahuen
+
+set -e
+
+ORG="${1:-}"
+DEST="${2:-.}"
+
+if [ -z "$ORG" ]; then
+    echo "Usage: gh-clone-org <org-or-url> [destination]"
+    exit 1
+fi
+
+# Extract org name from URL if needed
+ORG="${ORG##*/}"
+ORG="${ORG%.git}"
+
+# Check gh auth
+if ! gh auth status &>/dev/null; then
+    echo "Not authenticated. Run: gh auth login"
+    exit 1
+fi
+
+mkdir -p "$DEST"
+
+echo "Fetching repos for $ORG..."
+repos=$(gh repo list "$ORG" --limit 200 --json name,sshUrl,isArchived --jq '.[] | select(.isArchived == false) | .name + " " + .sshUrl')
+
+if [ -z "$repos" ]; then
+    echo "No repos found (or no access). Try: gh auth login"
+    exit 1
+fi
+
+total=$(echo "$repos" | wc -l | tr -d ' ')
+count=0
+
+echo "$repos" | while read -r name url; do
+    count=$((count + 1))
+    if [ -d "$DEST/$name" ]; then
+        echo "[$count/$total] $name (exists, pulling)"
+        git -C "$DEST/$name" pull --ff-only 2>/dev/null || true
+    else
+        echo "[$count/$total] $name (cloning)"
+        git clone "$url" "$DEST/$name" 2>/dev/null
+    fi
+done
+
+echo ""
+echo "Done. $total repos in $DEST/"
