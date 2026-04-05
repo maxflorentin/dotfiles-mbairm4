@@ -1,0 +1,88 @@
+#!/bin/bash
+
+# tmux-layout: Create a workspace layout for a client session
+# Usage: tmux-layout <client> [project]
+#   client  - client name (e.g. mutt)
+#   project - fuzzy project name (e.g. "cdc" matches "spark-cdc")
+
+set -e
+
+CLIENT="$1"
+PROJECT="${2:-}"
+CLIENT_DIR="$HOME/clients/$CLIENT"
+CLIENTRC="$CLIENT_DIR/.clientrc"
+
+# Resolve project directory (fuzzy match)
+resolve_project_dir() {
+    local base="$1"
+    local query="$2"
+
+    # Exact match first
+    [ -d "$base/$query" ] && echo "$base/$query" && return
+
+    # Fuzzy: find dirs containing the query
+    local match
+    match=$(find "$base" -maxdepth 1 -type d -iname "*${query}*" 2>/dev/null | head -1)
+
+    if [ -n "$match" ]; then
+        echo "$match"
+    else
+        echo "$base"
+    fi
+}
+
+# Source client profile + run a command in a pane
+_pane_init() {
+    local target="$1"
+    shift
+    tmux send-keys -t "$target" "source $CLIENTRC 2>/dev/null; clear" Enter
+    if [ $# -gt 0 ]; then
+        sleep 0.2
+        tmux send-keys -t "$target" "$*" Enter
+    fi
+}
+
+# Determine working directory and session name
+if [ -n "$PROJECT" ]; then
+    WORK_DIR=$(resolve_project_dir "$CLIENT_DIR" "$PROJECT")
+    SESSION="${CLIENT}-${PROJECT}"
+else
+    WORK_DIR="$CLIENT_DIR"
+    SESSION="$CLIENT"
+fi
+
+[ ! -d "$WORK_DIR" ] && WORK_DIR="$HOME"
+
+# If session already exists, just attach
+if tmux has-session -t "=$SESSION" 2>/dev/null; then
+    tmux attach -t "=$SESSION"
+    exit 0
+fi
+
+# Window 1: workspace (3 panes)
+tmux new-session -d -s "$SESSION" -c "$WORK_DIR" -n "workspace"
+sleep 0.3
+
+tmux split-window -h -t "$SESSION:workspace" -c "$WORK_DIR" -l 35%
+tmux split-window -v -t "$SESSION:workspace.1" -c "$WORK_DIR" -l 40%
+
+# Init all panes
+_pane_init "$SESSION:workspace.0"
+_pane_init "$SESSION:workspace.1"
+_pane_init "$SESSION:workspace.2" "git status 2>/dev/null"
+
+tmux select-pane -t "$SESSION:workspace.0"
+
+# Window 2: docker
+tmux new-window -t "$SESSION" -n "docker" -c "$WORK_DIR"
+_pane_init "$SESSION:docker" "docker ps 2>/dev/null || echo 'No containers running'"
+
+# Window 3: htop
+tmux new-window -t "$SESSION" -n "htop" -c "$WORK_DIR"
+tmux send-keys -t "$SESSION:htop" "htop" Enter
+
+# Go back to workspace window
+tmux select-window -t "$SESSION:workspace"
+
+# Attach
+tmux attach -t "$SESSION"

@@ -1,3 +1,4 @@
-# Environment file with machine-specific variables
 .env
 .envrc
+.claude/
+editors/nvim/lazy-lock.json

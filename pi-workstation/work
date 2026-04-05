@@ -1,0 +1,387 @@
+#!/bin/bash
+
+# work: Manage freelance workspaces on Raspberry Pi 400
+# Usage: work <command> [args]
+
+set -e
+
+PI_HOST="${WORK_PI_HOST:-pi-workstation}"
+PI_USER="${WORK_PI_USER:-max}"
+CLIENTS_DIR="clients"
+
+_validate_client_name() {
+    local name="$1"
+    if [[ ! "$name" =~ ^[a-zA-Z][a-zA-Z0-9_-]*$ ]]; then
+        echo "Error: client name must start with a letter (a-z, 0-9, -, _)"
+        exit 1
+    fi
+}
+
+_ssh() {
+    ssh -t "$PI_USER@$PI_HOST" "$@"
+}
+
+_ssh_quiet() {
+    ssh -o ConnectTimeout=3 "$PI_USER@$PI_HOST" "$@" 2>/dev/null
+}
+
+cmd_connect() {
+    local client="${1:-}"
+    local project="${2:-}"
+
+    if [ -n "$client" ]; then
+        _validate_client_name "$client"
+        if [ -n "$project" ]; then
+            _ssh "~/dotfiles/pi-workstation/tmux-layout '$client' '$project'"
+        else
+            _ssh "~/dotfiles/pi-workstation/tmux-layout '$client'"
+        fi
+    else
+        _ssh "tmux attach 2>/dev/null || tmux new -s main"
+    fi
+}
+
+cmd_setup() {
+    local client="$1"
+    if [ -z "$client" ]; then
+        echo "Usage: work setup <client-name>"
+        echo ""
+        echo "Creates project structure + envy context on Pi"
+        exit 1
+    fi
+
+    _validate_client_name "$client"
+    echo "Setting up workspace for: $client"
+    echo ""
+
+    _ssh "
+        # Directory structure
+        mkdir -p ~/$CLIENTS_DIR/$client/.kube
+
+        # Envy context
+        echo '$client' > ~/$CLIENTS_DIR/$client/.envy-context
+        test -f ~/.envy/keys/$client.key || envy-new $client 2>/dev/null || true
+
+        # Python venv via uv
+        cd ~/$CLIENTS_DIR/$client
+        if [ ! -d .venv ]; then
+            ~/.local/bin/uv venv .venv 2>/dev/null && echo 'venv created'
+        fi
+
+        # Client profile (sourced by tmux-layout, VS Code, etc.)
+        cat > ~/$CLIENTS_DIR/$client/.clientrc << CLIENTRC
+export AWS_PROFILE=$client
+export CLOUDSDK_ACTIVE_CONFIG_NAME=$client
+export DATABRICKS_CONFIG_PROFILE=$client
+export KUBECONFIG=\\\$HOME/clients/$client/.kube/config
+[ -f \\\$HOME/clients/$client/.venv/bin/activate ] && source \\\$HOME/clients/$client/.venv/bin/activate
+CLIENTRC
+    "
+
+    echo ""
+    echo "Workspace ready: ~/$CLIENTS_DIR/$client/"
+    echo "  envy:  $client"
+    echo "  venv:  ~/$CLIENTS_DIR/$client/.venv"
+    echo "  kube:  ~/$CLIENTS_DIR/$client/.kube/"
+    echo ""
+    echo "Connect with: work connect $client"
+}
+
+cmd_vpn_up() {
+    local client="$1"
+    if [ -z "$client" ]; then
+        echo "Usage: work vpn-up <client-name>"
+        echo "Starts WireGuard VPN for client (config must exist at /etc/wireguard/<client>.conf)"
+        exit 1
+    fi
+
+    _validate_client_name "$client"
+
+    # Check for full tunnel (0.0.0.0/0) which would kill SSH
+    local allowed
+    allowed=$(_ssh_quiet "sudo grep -i 'AllowedIPs' /etc/wireguard/$client.conf 2>/dev/null")
+    if echo "$allowed" | grep -q '0\.0\.0\.0/0'; then
+        echo "WARNING: $client.conf routes ALL traffic (AllowedIPs = 0.0.0.0/0)"
+        echo "This will kill your SSH connection to the Pi."
+        echo ""
+        echo "Edit /etc/wireguard/$client.conf on the Pi and set AllowedIPs"
+        echo "to only the client's internal subnets. Example:"
+        echo "  AllowedIPs = 10.0.0.0/8, 172.16.0.0/12"
+        echo ""
+        read -p "Start anyway? (yes/no): " confirm
+        [ "$confirm" != "yes" ] && exit 0
+    fi
+
+    echo "Starting VPN for $client..."
+    _ssh "sudo wg-quick up -- '$client'"
+    echo "VPN active. Check with: work status"
+}
+
+cmd_vpn_down() {
+    local client="$1"
+    if [ -z "$client" ]; then
+        echo "Usage: work vpn-down <client-name>"
+        exit 1
+    fi
+
+    _validate_client_name "$client"
+    _ssh "sudo wg-quick down -- '$client'" 2>/dev/null || true
+    echo "VPN stopped for $client"
+}
+
+cmd_status() {
+    echo "=== Pi Status ==="
+    echo ""
+
+    # Check connectivity
+    if ! _ssh_quiet "echo ok" >/dev/null; then
+        echo "Pi is offline or unreachable at $PI_HOST"
+        exit 1
+    fi
+
+    _ssh 'bash -s' <<'REMOTE'
+        echo "Host: $(hostname)"
+        echo "Uptime: $(uptime -p 2>/dev/null || uptime | sed 's/.*up //')"
+        echo ""
+
+        echo "Memory:"
+        free -h | grep Mem | awk '{printf "  Used: %s / %s (free: %s)\n", $3, $2, $4}'
+        echo ""
+
+        echo "Docker:"
+        docker ps --format "  {{.Names}}: {{.Status}}" 2>/dev/null || echo "  (not running)"
+        echo ""
+
+        echo "VPN:"
+        sudo wg show 2>/dev/null | grep "interface" | awk '{print "  " $2 ": active"}' || echo "  (none active)"
+        echo ""
+
+        echo "Tmux sessions:"
+        tmux list-sessions 2>/dev/null | sed 's/^/  /' || echo "  (none)"
+        echo ""
+
+        echo "Clients:"
+        ls -1 ~/clients/ 2>/dev/null | sed 's/^/  /' || echo "  (none)"
+REMOTE
+}
+
+cmd_sync() {
+    local client="$1"
+    local dir="${2:-.}"
+
+    if [ -z "$client" ]; then
+        echo "Usage: work sync <client-name> [local-dir]"
+        echo "Syncs local dir to Pi client workspace"
+        exit 1
+    fi
+
+    rsync -avz --exclude '.git' --exclude 'node_modules' --exclude '.venv' --exclude '__pycache__' \
+        "$dir/" "$PI_USER@$PI_HOST:~/$CLIENTS_DIR/$client/"
+    echo "Synced to Pi:~/$CLIENTS_DIR/$client/"
+}
+
+cmd_destroy() {
+    local client="$1"
+    if [ -z "$client" ]; then
+        echo "Usage: work destroy <client-name>"
+        exit 1
+    fi
+
+    _validate_client_name "$client"
+    [ -z "$CLIENTS_DIR" ] && { echo "FATAL: CLIENTS_DIR is empty"; exit 1; }
+
+    echo "This will delete ALL data for client '$client' on Pi:"
+    echo "  - ~/$CLIENTS_DIR/$client/"
+    echo "  - envy context '$client'"
+    echo "  - VPN config (if exists)"
+    echo ""
+    read -p "Type 'yes' to confirm: " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "Aborted."
+        exit 0
+    fi
+
+    _ssh "
+        rm -rf ~/'$CLIENTS_DIR'/'$client'
+        rm -f ~/.envy/'$client'.envy.age ~/.envy/keys/'$client'.key
+        sudo rm -f /etc/wireguard/'$client'.conf
+        tmux kill-session -t '$client' 2>/dev/null || true
+    "
+
+    echo "Workspace '$client' destroyed."
+}
+
+cmd_browse() {
+    local client="$1"
+    if [ -z "$client" ]; then
+        echo "Usage: work browse <client-name>"
+        echo "Opens isolated Chrome routed through Pi's network/VPN"
+        exit 1
+    fi
+
+    _validate_client_name "$client"
+    # Deterministic per-client port: hash client name to 1080-2079 range
+    local proxy_port=$(( 1080 + $(printf '%s' "$client" | cksum | cut -d' ' -f1) % 1000 ))
+    local chrome_dir="$HOME/.chrome-clients/$client"
+
+    # Check if proxy is already running for this client
+    if ! lsof -i ":$proxy_port" &>/dev/null; then
+        echo "Starting SOCKS proxy for $client on port $proxy_port..."
+        ssh -D "127.0.0.1:$proxy_port" -N -f "$PI_USER@$PI_HOST"
+    fi
+
+    echo "Opening Chrome for client '$client'..."
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+        --proxy-server="socks5://127.0.0.1:$proxy_port" \
+        --user-data-dir="$chrome_dir" \
+        --no-first-run \
+        &>/dev/null &
+
+    echo "Chrome running with Pi network (proxy :$proxy_port). Stop with: work browse-stop $client"
+}
+
+cmd_browse_stop() {
+    local client="${1:-}"
+    if [ -n "$client" ]; then
+        _validate_client_name "$client"
+        local proxy_port=$(( 1080 + $(printf '%s' "$client" | cksum | cut -d' ' -f1) % 1000 ))
+        local pid=$(lsof -ti ":$proxy_port" 2>/dev/null)
+        if [ -n "$pid" ]; then
+            kill "$pid"
+            echo "SOCKS proxy stopped for $client (port $proxy_port)."
+        else
+            echo "No proxy running for $client on port $proxy_port."
+        fi
+    else
+        # Stop all SOCKS proxies (ssh -D)
+        local pids=$(ps aux | grep 'ssh -D 127.0.0.1' | grep -v grep | awk '{print $2}')
+        if [ -n "$pids" ]; then
+            echo "$pids" | xargs kill
+            echo "All SOCKS proxies stopped."
+        else
+            echo "No proxies running."
+        fi
+    fi
+}
+
+cmd_health() {
+    local warn=""
+
+    # Connectivity
+    if ! _ssh_quiet "echo ok" >/dev/null; then
+        osascript -e 'display notification "Pi is OFFLINE" with title "work health" sound name "Basso"' 2>/dev/null
+        echo "OFFLINE - Pi unreachable at $PI_HOST"
+        exit 1
+    fi
+
+    # Gather metrics
+    local metrics
+    metrics=$(_ssh_quiet "
+        # RAM usage percentage
+        ram_pct=\$(free | awk '/Mem/{printf \"%.0f\", \$3/\$2*100}')
+        ram_used=\$(free -h | awk '/Mem/{print \$3}')
+        ram_total=\$(free -h | awk '/Mem/{print \$2}')
+
+        # Disk usage percentage
+        disk_pct=\$(df / | awk 'NR==2{gsub(/%/,\"\"); print \$5}')
+        disk_used=\$(df -h / | awk 'NR==2{print \$3}')
+        disk_total=\$(df -h / | awk 'NR==2{print \$2}')
+
+        # CPU temp
+        temp=\$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
+        temp_c=\$((temp / 1000))
+
+        # Load
+        load=\$(awk '{print \$1}' /proc/loadavg)
+
+        # Docker containers
+        docker_count=\$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')
+
+        # WireGuard
+        wg_count=\$(sudo wg show 2>/dev/null | grep -c 'interface' || echo 0)
+
+        # Uptime
+        up=\$(uptime -p 2>/dev/null | sed 's/up //')
+
+        echo \"ram_pct=\$ram_pct|ram=\${ram_used}/\${ram_total}|disk_pct=\$disk_pct|disk=\${disk_used}/\${disk_total}|temp=\${temp_c}|load=\$load|docker=\$docker_count|vpn=\$wg_count|up=\$up\"
+    ")
+
+    # Parse
+    local ram_pct=$(echo "$metrics" | cut -d'|' -f1 | cut -d'=' -f2)
+    local ram=$(echo "$metrics" | cut -d'|' -f2 | cut -d'=' -f2)
+    local disk_pct=$(echo "$metrics" | cut -d'|' -f3 | cut -d'=' -f2)
+    local disk=$(echo "$metrics" | cut -d'|' -f4 | cut -d'=' -f2)
+    local temp=$(echo "$metrics" | cut -d'|' -f5 | cut -d'=' -f2)
+    local load=$(echo "$metrics" | cut -d'|' -f6 | cut -d'=' -f2)
+    local docker=$(echo "$metrics" | cut -d'|' -f7 | cut -d'=' -f2)
+    local vpn=$(echo "$metrics" | cut -d'|' -f8 | cut -d'=' -f2)
+    local up=$(echo "$metrics" | cut -d'|' -f9 | cut -d'=' -f2)
+
+    # Alerts
+    [ "$ram_pct" -gt 85 ] 2>/dev/null && warn="${warn}RAM critical (${ram_pct}%) "
+    [ "$disk_pct" -gt 85 ] 2>/dev/null && warn="${warn}Disk critical (${disk_pct}%) "
+    [ "$temp" -gt 75 ] 2>/dev/null && warn="${warn}Temp high (${temp}C) "
+
+    # Output
+    echo "pi-workstation  up $up"
+    echo ""
+    echo "  RAM    ${ram} (${ram_pct}%)"
+    echo "  Disk   ${disk} (${disk_pct}%)"
+    echo "  Temp   ${temp}C"
+    echo "  Load   ${load}"
+    echo "  Docker ${docker} containers"
+    echo "  VPN    ${vpn} active"
+
+    if [ -n "$warn" ]; then
+        echo ""
+        echo "  WARN: $warn"
+        local safe_warn=$(echo "$warn" | tr -cd '[:alnum:] %().')
+        osascript -e "display notification \"$safe_warn\" with title \"work health\" sound name \"Basso\"" 2>/dev/null
+    fi
+}
+
+cmd_watch() {
+    echo "Monitoring Pi (Ctrl+C to stop)..."
+    while true; do
+        clear
+        cmd_health
+        sleep "${1:-30}"
+    done
+}
+
+cmd_help() {
+    echo "work - Manage freelance workspaces on Pi"
+    echo ""
+    echo "Commands:"
+    echo "  work connect [client] [project]  SSH + tmux (fuzzy project match)"
+    echo "  work setup <client>       Create new client workspace"
+    echo "  work status               Show Pi status, VPNs, sessions"
+    echo "  work health               Quick health check with alerts"
+    echo "  work watch [seconds]      Live monitor (default: 30s)"
+    echo "  work sync <client> [dir]  Rsync local dir to Pi"
+    echo "  work browse <client>      Chrome isolated via Pi network"
+    echo "  work browse-stop          Stop the SOCKS proxy"
+    echo "  work vpn-up <client>      Start client VPN"
+    echo "  work vpn-down <client>    Stop client VPN"
+    echo "  work destroy <client>     Delete all client data"
+    echo ""
+    echo "Config (env vars):"
+    echo "  WORK_PI_HOST      Pi hostname (default: pi-workstation)"
+    echo "  WORK_PI_USER      Pi username (default: max)"
+    echo "  WORK_PROXY_PORT   SOCKS proxy port (default: 1080)"
+}
+
+case "${1:-}" in
+    connect)      shift; cmd_connect "$@" ;;
+    setup)        shift; cmd_setup "$@" ;;
+    status)       cmd_status ;;
+    health)       cmd_health ;;
+    watch)        shift; cmd_watch "$@" ;;
+    sync)         shift; cmd_sync "$@" ;;
+    browse)       shift; cmd_browse "$@" ;;
+    browse-stop)  cmd_browse_stop ;;
+    vpn-up)       shift; cmd_vpn_up "$@" ;;
+    vpn-down)     shift; cmd_vpn_down "$@" ;;
+    destroy)      shift; cmd_destroy "$@" ;;
+    *)            cmd_help ;;
+esac

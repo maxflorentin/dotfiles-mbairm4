@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# envy-list: List all contexts and their variables
+# Usage: envy-list [context]
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_KEYS_DIR="${ENVY_DIR}/keys"
+ENVY_CONFIG="${ENVY_DIR}/config"
+
+if [ ! -d "${ENVY_KEYS_DIR}" ]; then
+    echo "❌ Envy not initialized. Run: envy-init"
+    exit 1
+fi
+
+# Get current context
+CURRENT_CONTEXT=""
+if [ -f "${ENVY_CONFIG}" ]; then
+    CURRENT_CONTEXT=$(cat "${ENVY_CONFIG}")
+fi
+
+# List specific context or all
+if [ -n "$1" ]; then
+    # Show specific context
+    CONTEXT="$1"
+    KEY_FILE="${ENVY_KEYS_DIR}/${CONTEXT}.key"
+    ENVY_FILE="${ENVY_DIR}/${CONTEXT}.envy.age"
+
+    if [ ! -f "${KEY_FILE}" ]; then
+        echo "❌ Context '${CONTEXT}' not found"
+        exit 1
+    fi
+
+    echo "📦 Context: ${CONTEXT}"
+    if [ "${CONTEXT}" = "${CURRENT_CONTEXT}" ]; then
+        echo "   (active)"
+    fi
+    echo ""
+
+    if [ -f "${ENVY_FILE}" ]; then
+        age -d -i "${KEY_FILE}" "${ENVY_FILE}" 2>/dev/null | grep -v '^#' | grep '=' | while IFS='=' read -r key value; do
+            # Check if multiline (base64 encoded)
+            if [[ "${value}" == base64:* ]]; then
+                echo "  ${key}=<multiline> 📄"
+            else
+                # Show key with masked value
+                echo "  ${key}=${value:0:4}***"
+            fi
+        done
+    else
+        echo "  (empty)"
+    fi
+else
+    # Show all contexts
+    echo "🔐 Envy Contexts"
+    echo ""
+
+    if [ -n "${CURRENT_CONTEXT}" ]; then
+        echo "Current: ${CURRENT_CONTEXT}"
+        echo ""
+    fi
+
+    CONTEXTS=$(ls -1 "${ENVY_KEYS_DIR}" 2>/dev/null | sed 's/.key$//')
+
+    if [ -z "${CONTEXTS}" ]; then
+        echo "No contexts found. Create one with: envy-new <name>"
+        exit 0
+    fi
+
+    while IFS= read -r context; do
+        ENVY_FILE="${ENVY_DIR}/${context}.envy.age"
+
+        if [ "${context}" = "${CURRENT_CONTEXT}" ]; then
+            echo "• ${context} ★"
+        else
+            echo "• ${context}"
+        fi
+
+        if [ -f "${ENVY_FILE}" ]; then
+            KEY_FILE="${ENVY_KEYS_DIR}/${context}.key"
+            COUNT=$(age -d -i "${KEY_FILE}" "${ENVY_FILE}" 2>/dev/null | grep -c '^[^#].*=' || echo "0")
+            echo "  ${COUNT} variables"
+        else
+            echo "  (empty)"
+        fi
+        echo ""
+    done <<< "${CONTEXTS}"
+
+    echo "Use 'envy-list <context>' to see variables"
+fi

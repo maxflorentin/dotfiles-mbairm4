@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# envy-rm: Remove a secret from current context
+# Usage: envy-rm <KEY>
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_KEYS_DIR="${ENVY_DIR}/keys"
+ENVY_CONFIG="${ENVY_DIR}/config"
+
+if [ -z "$1" ]; then
+    echo "Usage: envy-rm <KEY>"
+    echo ""
+    echo "Example:"
+    echo "  envy-rm TEST_KEY"
+    echo "  envy-rm GITHUB_TOKEN"
+    exit 1
+fi
+
+KEY="$1"
+
+# Get current context
+if [ ! -f "${ENVY_CONFIG}" ]; then
+    echo "❌ No context selected. Run: envy-switch <context>"
+    exit 1
+fi
+
+CONTEXT=$(cat "${ENVY_CONFIG}")
+KEY_FILE="${ENVY_KEYS_DIR}/${CONTEXT}.key"
+ENVY_FILE="${ENVY_DIR}/${CONTEXT}.envy.age"
+
+# Verify context exists
+if [ ! -f "${KEY_FILE}" ]; then
+    echo "❌ Context '${CONTEXT}' not found"
+    exit 1
+fi
+
+if [ ! -f "${ENVY_FILE}" ]; then
+    echo "❌ No secrets in context '${CONTEXT}'"
+    exit 1
+fi
+
+# Get public key
+PUBLIC_KEY=$(age-keygen -y "${KEY_FILE}")
+
+# Decrypt current file
+TEMP_FILE=$(mktemp)
+trap "rm -f ${TEMP_FILE}" EXIT
+
+age -d -i "${KEY_FILE}" "${ENVY_FILE}" > "${TEMP_FILE}" 2>/dev/null
+
+# Check if key exists
+if ! grep -q "^${KEY}=" "${TEMP_FILE}"; then
+    echo "❌ Key '${KEY}' not found in context '${CONTEXT}'"
+    exit 1
+fi
+
+# Remove the key
+sed -i.bak "/^${KEY}=/d" "${TEMP_FILE}"
+rm -f "${TEMP_FILE}.bak"
+
+# Re-encrypt
+age -r "${PUBLIC_KEY}" -o "${ENVY_FILE}" < "${TEMP_FILE}"
+
+echo "✓ Removed: ${KEY} from context '${CONTEXT}'"

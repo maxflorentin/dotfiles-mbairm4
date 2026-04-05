@@ -1,0 +1,108 @@
+#!/bin/bash
+
+# envy-load: Load all variables from a context
+# Usage: envy-load <context>
+#        eval "$(envy-load <context> --export)"
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_KEYS_DIR="${ENVY_DIR}/keys"
+ENVY_CONFIG="${ENVY_DIR}/config"
+EXPORT_MODE=false
+
+# Parse arguments
+CONTEXT=""
+for arg in "$@"; do
+    case "$arg" in
+        --export)
+            EXPORT_MODE=true
+            ;;
+        *)
+            CONTEXT="$arg"
+            ;;
+    esac
+done
+
+if [ -z "${CONTEXT}" ]; then
+    # Auto-detect: walk up from current dir looking for .envy-context
+    _dir="$PWD"
+    while [ "$_dir" != "/" ]; do
+        if [ -f "$_dir/.envy-context" ]; then
+            CONTEXT=$(cat "$_dir/.envy-context")
+            break
+        fi
+        _dir=$(dirname "$_dir")
+    done
+fi
+
+if [ -z "${CONTEXT}" ]; then
+    # Fallback to global config
+    if [ -f "${ENVY_CONFIG}" ]; then
+        CONTEXT=$(cat "${ENVY_CONFIG}")
+    else
+        echo "Usage: envy-load <context>"
+        echo ""
+        echo "Available contexts:"
+        ls -1 "${ENVY_KEYS_DIR}" 2>/dev/null | sed 's/.key$//' | sed 's/^/  • /' || echo "  (none - run envy-new first)"
+        exit 1
+    fi
+fi
+
+KEY_FILE="${ENVY_KEYS_DIR}/${CONTEXT}.key"
+ENVY_FILE="${ENVY_DIR}/${CONTEXT}.envy.age"
+
+# Verify files exist
+if [ ! -f "${KEY_FILE}" ]; then
+    echo "❌ Context '${CONTEXT}' not found" >&2
+    echo "Create it with: envy-new ${CONTEXT}" >&2
+    exit 1
+fi
+
+if [ ! -f "${ENVY_FILE}" ]; then
+    echo "❌ No secrets in context '${CONTEXT}'" >&2
+    echo "Add secrets with: envy-set KEY value" >&2
+    exit 1
+fi
+
+# Decrypt file
+DECRYPTED=$(age -d -i "${KEY_FILE}" "${ENVY_FILE}" 2>/dev/null)
+
+if [ "${EXPORT_MODE}" = true ]; then
+    # Export mode: output export statements
+    echo "${DECRYPTED}" | grep -v '^#' | grep '=' | while IFS= read -r line; do
+        KEY="${line%%=*}"
+        VALUE="${line#*=}"
+
+        # Decode base64-encoded values
+        if [[ "${VALUE}" =~ ^base64: ]]; then
+            DECODED_VALUE=$(echo "${VALUE#base64:}" | base64 -d)
+            echo "export ${KEY}='${DECODED_VALUE}'"
+        else
+            echo "export ${line}"
+        fi
+    done
+else
+    # Interactive mode: show what would be loaded
+    echo "📦 Context: ${CONTEXT}"
+    echo ""
+
+    COUNT=0
+    while IFS= read -r line; do
+        # Skip comments and empty lines
+        if [[ "$line" =~ ^#.*$ ]] || [ -z "$line" ]; then
+            continue
+        fi
+
+        # Extract key name (before =)
+        KEY="${line%%=*}"
+        echo "  ✓ ${KEY}"
+        COUNT=$((COUNT + 1))
+    done <<< "${DECRYPTED}"
+
+    echo ""
+    echo "Loaded: ${COUNT} variables"
+    echo ""
+    echo "To export in current shell:"
+    echo "  eval \"\$(envy-load ${CONTEXT} --export)\""
+fi

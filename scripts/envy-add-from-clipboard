@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# envy-add-from-clipboard: Add multiple secrets from clipboard (easiest method)
+# Usage: envy-add-from-clipboard <context> <KEY1> [KEY2] [KEY3] ...
+
+set -e
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+  echo "Usage: envy-add-from-clipboard <context> <KEY1> [KEY2] ..."
+  echo ""
+  echo "Workflow:"
+  echo "  1. Copy secret to clipboard (Cmd+C)"
+  echo "  2. Press Enter to add"
+  echo "  3. Repeat for each secret"
+  echo ""
+  echo "Example:"
+  echo "  envy-add-from-clipboard work API_KEY SECRET_KEY APP_KEY"
+  exit 1
+fi
+
+CONTEXT="$1"
+shift # Remove context, rest are keys
+
+ENVY_DIR="${HOME}/.envy"
+
+# Check if context exists
+if [ ! -f "${ENVY_DIR}/keys/${CONTEXT}.key" ]; then
+  echo "❌ Context '${CONTEXT}' not found"
+  echo "Create it with: envy-new ${CONTEXT}"
+  exit 1
+fi
+
+# Switch to context
+echo "📦 Context: ${CONTEXT}"
+envy-switch "${CONTEXT}" >/dev/null
+echo ""
+
+# Add each key
+for KEY in "$@"; do
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "🔑 ${KEY}"
+  echo ""
+
+  # Check if key already exists
+  if [ -f "${ENVY_DIR}/${CONTEXT}.envy.age" ]; then
+    if age -d -i "${ENVY_DIR}/keys/${CONTEXT}.key" "${ENVY_DIR}/${CONTEXT}.envy.age" 2>/dev/null | grep -q "^${KEY}="; then
+      echo "⚠️  Already exists"
+      read -p "Overwrite? (y/N): " OVERWRITE
+      if [[ ! "$OVERWRITE" =~ ^[Yy]$ ]]; then
+        echo "Skipped."
+        echo ""
+        continue
+      fi
+      echo ""
+    fi
+  fi
+
+  # Get from clipboard
+  echo "1. Copy the secret value (Cmd+C)"
+  echo "2. Press Enter to read from clipboard"
+  echo "   (or 's' + Enter to skip)"
+  echo ""
+  read -p "> " ACTION
+
+  if [ "$ACTION" = "s" ]; then
+    echo "Skipped."
+    echo ""
+    continue
+  fi
+
+  VALUE=$(pbpaste)
+  if [ -z "$VALUE" ]; then
+    echo "✗ Clipboard is empty - skipped"
+    echo ""
+    continue
+  fi
+
+  # Add to envy
+  envy-set "${KEY}" "${VALUE}" >/dev/null 2>&1
+  echo "✓ Added (${#VALUE} chars)"
+  echo ""
+done
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ Done!"
+echo ""
+echo "Verify: envy-list ${CONTEXT}"

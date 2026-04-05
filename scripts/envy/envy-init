@@ -1,0 +1,91 @@
+#!/bin/bash
+
+# envy-init: Initialize envy environment
+# Usage: envy-init
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_KEYS_DIR="${ENVY_DIR}/keys"
+ENVY_CONFIG="${ENVY_DIR}/config"
+
+echo "🔐 Envy - Encrypted Environment Manager"
+echo ""
+
+# Check if age is installed
+if ! command -v age &> /dev/null; then
+    echo "❌ age is not installed"
+    echo ""
+    echo "Installing age..."
+    if command -v brew &> /dev/null; then
+        brew install age
+        echo "✓ age installed"
+    else
+        echo "Please install age manually: https://github.com/FiloSottile/age"
+        exit 1
+    fi
+fi
+
+echo "✓ age is installed"
+
+# Create directory structure
+mkdir -p "${ENVY_KEYS_DIR}"
+echo "✓ Created ${ENVY_DIR}"
+
+# Create .gitignore
+cat > "${ENVY_DIR}/.gitignore" <<EOF
+# Never commit private keys!
+keys/
+*.key
+
+# Decrypted files (if any)
+*.envy
+!*.envy.age
+EOF
+
+echo "✓ Created .gitignore"
+
+# Create default config
+if [ ! -f "${ENVY_CONFIG}" ]; then
+    echo "personal" > "${ENVY_CONFIG}"
+    echo "✓ Set default context: personal"
+fi
+
+# Create README
+cat > "${ENVY_DIR}/README.md" <<EOF
+# Envy Secrets
+
+This directory contains encrypted environment variables.
+
+## Structure
+
+- \`keys/\` - Encryption keys (NEVER commit or share these!)
+- \`*.envy.age\` - Encrypted environment files
+- \`config\` - Current active context
+
+## Usage
+
+\`\`\`bash
+envy-load personal    # Load personal secrets
+envy-set API_KEY "xxx" # Add new secret
+envy-list             # List all contexts
+\`\`\`
+
+## Backup
+
+- ✅ Safe to backup: \`*.envy.age\` files
+- ❌ Keep private: \`keys/\` directory
+- 💡 Consider storing keys in a password manager
+EOF
+
+echo "✓ Created README"
+
+echo ""
+echo "✅ Envy initialized successfully!"
+echo ""
+echo "Next steps:"
+echo "  1. Create a context: envy-new personal"
+echo "  2. Add secrets: envy-set GITHUB_TOKEN 'xxx'"
+echo "  3. Load context: envy-load personal"
+echo ""
+echo "Directory: ${ENVY_DIR}"

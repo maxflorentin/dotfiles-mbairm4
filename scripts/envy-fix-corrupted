@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# envy-fix-corrupted: Fix corrupted context by removing invalid lines
+# Usage: envy-fix-corrupted <context>
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_KEYS_DIR="${ENVY_DIR}/keys"
+
+if [ -z "$1" ]; then
+    echo "Usage: envy-fix-corrupted <context>"
+    echo ""
+    echo "This will remove lines without KEY=value format"
+    exit 1
+fi
+
+CONTEXT="$1"
+KEY_FILE="${ENVY_KEYS_DIR}/${CONTEXT}.key"
+ENVY_FILE="${ENVY_DIR}/${CONTEXT}.envy.age"
+
+if [ ! -f "${KEY_FILE}" ] || [ ! -f "${ENVY_FILE}" ]; then
+    echo "❌ Context '${CONTEXT}' not found"
+    exit 1
+fi
+
+echo "🔧 Fixing context: ${CONTEXT}"
+echo ""
+
+# Decrypt
+TEMP_FILE=$(mktemp)
+trap "rm -f ${TEMP_FILE}" EXIT
+
+age -d -i "${KEY_FILE}" "${ENVY_FILE}" > "${TEMP_FILE}" 2>/dev/null
+
+echo "Current contents:"
+cat "${TEMP_FILE}"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Keep only valid lines (comments and KEY=value format)
+CLEAN_FILE=$(mktemp)
+trap "rm -f ${TEMP_FILE} ${CLEAN_FILE}" EXIT
+
+grep -E '^(#|[A-Za-z_][A-Za-z0-9_]*=)' "${TEMP_FILE}" > "${CLEAN_FILE}" || echo "# Environment: ${CONTEXT}" > "${CLEAN_FILE}"
+
+echo "After cleanup:"
+cat "${CLEAN_FILE}"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+read -p "Apply this fix? (y/N): " CONFIRM
+if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 0
+fi
+
+# Get public key and re-encrypt
+PUBLIC_KEY=$(age-keygen -y "${KEY_FILE}")
+age -r "${PUBLIC_KEY}" -o "${ENVY_FILE}" < "${CLEAN_FILE}"
+
+echo ""
+echo "✓ Fixed context: ${CONTEXT}"
+echo ""
+echo "Verify with: envy-list ${CONTEXT}"

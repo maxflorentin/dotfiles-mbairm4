@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# envy-get: Get a variable from current context
+# Usage: envy-get <KEY>
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_KEYS_DIR="${ENVY_DIR}/keys"
+ENVY_CONFIG="${ENVY_DIR}/config"
+
+if [ -z "$1" ]; then
+    echo "Usage: envy-get <KEY>"
+    echo ""
+    echo "Example:"
+    echo "  envy-get GITHUB_TOKEN"
+    echo "  export API_KEY=\$(envy-get API_KEY)"
+    exit 1
+fi
+
+KEY="$1"
+
+# Get current context
+if [ ! -f "${ENVY_CONFIG}" ]; then
+    echo "❌ No context selected. Run: envy-switch <context>" >&2
+    exit 1
+fi
+
+CONTEXT=$(cat "${ENVY_CONFIG}")
+KEY_FILE="${ENVY_KEYS_DIR}/${CONTEXT}.key"
+ENVY_FILE="${ENVY_DIR}/${CONTEXT}.envy.age"
+
+# Verify files exist
+if [ ! -f "${KEY_FILE}" ] || [ ! -f "${ENVY_FILE}" ]; then
+    echo "❌ Context '${CONTEXT}' not found or empty" >&2
+    exit 1
+fi
+
+# Decrypt and extract value
+VALUE=$(age -d -i "${KEY_FILE}" "${ENVY_FILE}" 2>/dev/null | grep "^${KEY}=" | cut -d'=' -f2-)
+
+if [ -z "${VALUE}" ]; then
+    echo "❌ Key '${KEY}' not found in context '${CONTEXT}'" >&2
+    exit 1
+fi
+
+# Check if value is base64 encoded (multiline)
+if [[ "${VALUE}" == base64:* ]]; then
+    # Decode base64
+    ENCODED="${VALUE#base64:}"
+    echo "${ENCODED}" | base64 -d
+else
+    echo "${VALUE}"
+fi

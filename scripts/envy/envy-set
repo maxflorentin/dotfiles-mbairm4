@@ -1,0 +1,126 @@
+#!/bin/bash
+
+# envy-set: Set/update a variable in current context
+# Usage: envy-set <KEY> <value>
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_KEYS_DIR="${ENVY_DIR}/keys"
+ENVY_CONFIG="${ENVY_DIR}/config"
+
+if [ -z "$1" ]; then
+    echo "Usage: envy-set <KEY> [value]"
+    echo ""
+    echo "Examples:"
+    echo "  envy-set -c GITHUB_TOKEN           # From clipboard (recommended)"
+    echo "  envy-set GITHUB_TOKEN              # Secure prompt (typing only)"
+    echo "  envy-set GITHUB_TOKEN 'ghp_xxxx'   # Pass directly (insecure)"
+    exit 1
+fi
+
+# Parse flags
+USE_CLIPBOARD=false
+if [ "$1" = "-c" ]; then
+    USE_CLIPBOARD=true
+    shift
+fi
+
+KEY="$1"
+VALUE="$2"
+
+# If no value provided, get it from clipboard or prompt
+if [ -z "$VALUE" ]; then
+    if [ "$USE_CLIPBOARD" = true ]; then
+        # Read from clipboard
+        VALUE=$(pbpaste)
+        if [ -z "$VALUE" ]; then
+            echo "✗ Error: Clipboard is empty"
+            exit 1
+        fi
+        echo "✓ Read from clipboard (${#VALUE} chars)"
+    else
+        # Secure prompt with stty (better paste support than read -s)
+        echo -n "Enter value for '${KEY}' (input hidden): "
+
+        # Disable echo, read input, restore echo
+        stty -echo
+        read VALUE
+        stty echo
+
+        echo ""  # New line after hidden input
+
+        if [ -z "$VALUE" ]; then
+            echo "✗ Error: No value provided"
+            exit 1
+        fi
+
+        echo "Tip: Use 'envy-set -c ${KEY}' to paste from clipboard instead"
+    fi
+fi
+
+# Get current context
+if [ ! -f "${ENVY_CONFIG}" ]; then
+    echo "❌ No context selected. Run: envy-switch <context>"
+    exit 1
+fi
+
+CONTEXT=$(cat "${ENVY_CONFIG}")
+KEY_FILE="${ENVY_KEYS_DIR}/${CONTEXT}.key"
+ENVY_FILE="${ENVY_DIR}/${CONTEXT}.envy.age"
+
+# Verify context exists
+if [ ! -f "${KEY_FILE}" ]; then
+    echo "❌ Context '${CONTEXT}' not found"
+    echo "Create it with: envy-new ${CONTEXT}"
+    exit 1
+fi
+
+# Get public key
+PUBLIC_KEY=$(age-keygen -y "${KEY_FILE}")
+
+# Decrypt current file or create new
+TEMP_FILE=$(mktemp)
+trap "rm -f ${TEMP_FILE}" EXIT
+
+if [ -f "${ENVY_FILE}" ]; then
+    age -d -i "${KEY_FILE}" "${ENVY_FILE}" > "${TEMP_FILE}" 2>/dev/null || echo "# Environment: ${CONTEXT}" > "${TEMP_FILE}"
+else
+    echo "# Environment: ${CONTEXT}" > "${TEMP_FILE}"
+fi
+
+# Check if value is multiline
+if echo "$VALUE" | grep -q $'\n'; then
+    # Encode multiline values in base64 for safe storage
+    ENCODED_VALUE=$(echo "$VALUE" | base64)
+    STORE_VALUE="base64:${ENCODED_VALUE}"
+    IS_MULTILINE=true
+else
+    STORE_VALUE="${VALUE}"
+    IS_MULTILINE=false
+fi
+
+# Update or add the key
+if grep -q "^${KEY}=" "${TEMP_FILE}"; then
+    # Update existing key (use | as delimiter to avoid issues with /)
+    sed -i.bak "s|^${KEY}=.*|${KEY}=${STORE_VALUE}|" "${TEMP_FILE}"
+    rm -f "${TEMP_FILE}.bak"
+    if [ "$IS_MULTILINE" = true ]; then
+        echo "✓ Updated: ${KEY} (multiline, base64 encoded)"
+    else
+        echo "✓ Updated: ${KEY}"
+    fi
+else
+    # Add new key
+    echo "${KEY}=${STORE_VALUE}" >> "${TEMP_FILE}"
+    if [ "$IS_MULTILINE" = true ]; then
+        echo "✓ Added: ${KEY} (multiline, base64 encoded)"
+    else
+        echo "✓ Added: ${KEY}"
+    fi
+fi
+
+# Re-encrypt
+age -r "${PUBLIC_KEY}" -o "${ENVY_FILE}" < "${TEMP_FILE}"
+
+echo "✓ Saved to context: ${CONTEXT}"

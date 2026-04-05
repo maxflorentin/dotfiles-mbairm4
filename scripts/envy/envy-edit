@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# envy-edit: Edit encrypted file in $EDITOR
+# Usage: envy-edit [context]
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+ENVY_KEYS_DIR="${ENVY_DIR}/keys"
+ENVY_CONFIG="${ENVY_DIR}/config"
+
+# Get context
+if [ -n "$1" ]; then
+    CONTEXT="$1"
+else
+    if [ -f "${ENVY_CONFIG}" ]; then
+        CONTEXT=$(cat "${ENVY_CONFIG}")
+    else
+        echo "Usage: envy-edit [context]"
+        exit 1
+    fi
+fi
+
+KEY_FILE="${ENVY_KEYS_DIR}/${CONTEXT}.key"
+ENVY_FILE="${ENVY_DIR}/${CONTEXT}.envy.age"
+
+if [ ! -f "${KEY_FILE}" ]; then
+    echo "❌ Context '${CONTEXT}' not found"
+    exit 1
+fi
+
+# Get public key
+PUBLIC_KEY=$(age-keygen -y "${KEY_FILE}")
+
+# Create temp file
+TEMP_FILE=$(mktemp)
+trap "rm -f ${TEMP_FILE}" EXIT
+
+# Decrypt to temp file
+if [ -f "${ENVY_FILE}" ]; then
+    age -d -i "${KEY_FILE}" "${ENVY_FILE}" > "${TEMP_FILE}" 2>/dev/null
+else
+    echo "# Environment: ${CONTEXT}" > "${TEMP_FILE}"
+    echo "# Add your secrets below (format: KEY=value)" >> "${TEMP_FILE}"
+    echo "" >> "${TEMP_FILE}"
+fi
+
+# Get checksum before edit
+BEFORE=$(md5 -q "${TEMP_FILE}" 2>/dev/null || md5sum "${TEMP_FILE}" | cut -d' ' -f1)
+
+# Open in editor
+${EDITOR:-nano} "${TEMP_FILE}"
+
+# Get checksum after edit
+AFTER=$(md5 -q "${TEMP_FILE}" 2>/dev/null || md5sum "${TEMP_FILE}" | cut -d' ' -f1)
+
+# Check if file changed
+if [ "${BEFORE}" = "${AFTER}" ]; then
+    echo "No changes made"
+    exit 0
+fi
+
+# Re-encrypt
+age -r "${PUBLIC_KEY}" -o "${ENVY_FILE}" < "${TEMP_FILE}"
+
+echo "✓ Saved changes to: ${CONTEXT}"

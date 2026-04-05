@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# envy-rename-context: Rename a context (key + encrypted file + config)
+# Usage: envy-rename-context <old-name> <new-name>
+
+set -e
+
+ENVY_DIR="${HOME}/.envy"
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: envy-rename-context <old-name> <new-name>"
+    echo ""
+    echo "Example:"
+    echo "  envy-rename-context staging production"
+    exit 1
+fi
+
+OLD="$1"
+NEW="$2"
+
+OLD_KEY="${ENVY_DIR}/keys/${OLD}.key"
+NEW_KEY="${ENVY_DIR}/keys/${NEW}.key"
+OLD_FILE="${ENVY_DIR}/${OLD}.envy.age"
+NEW_FILE="${ENVY_DIR}/${NEW}.envy.age"
+
+if [ ! -f "${OLD_KEY}" ]; then
+    echo "Context '${OLD}' not found"
+    exit 1
+fi
+
+if [ -f "${NEW_KEY}" ]; then
+    echo "Context '${NEW}' already exists"
+    exit 1
+fi
+
+mv "${OLD_KEY}" "${NEW_KEY}"
+[ -f "${OLD_FILE}" ] && mv "${OLD_FILE}" "${NEW_FILE}"
+
+# Update config if it points to the old name
+if [ -f "${ENVY_DIR}/config" ]; then
+    CURRENT=$(cat "${ENVY_DIR}/config")
+    if [ "${CURRENT}" = "${OLD}" ]; then
+        echo "${NEW}" > "${ENVY_DIR}/config"
+    fi
+fi
+
+echo "Renamed '${OLD}' -> '${NEW}'"
