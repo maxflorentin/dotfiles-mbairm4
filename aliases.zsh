@@ -1,6 +1,7 @@
 # Shortcuts
 alias copyssh="pbcopy < $HOME/.ssh/id_ed25519.pub"
 alias reloadshell="exec zsh"
+alias dotpull='git -C ~/.dotfiles pull && git -C ~/dotfiles pull 2>/dev/null; exec zsh'
 alias reloaddns="dscacheutil -flushcache && sudo killall -HUP mDNSResponder"
 alias l="eza -l --group-directories-first --icons"
 alias ll="eza -la --group-directories-first --icons --git"
@@ -17,9 +18,11 @@ alias c="clear"
 alias vim=nvim
 alias k=kubectl
 
-# Docker/Podman
-alias docker=podman
-alias docker-compose='podman compose'
+# Docker/Podman (only alias if podman exists)
+if command -v podman &>/dev/null; then
+    alias docker=podman
+    alias docker-compose='podman compose'
+fi
 alias dps='podman ps'
 alias dimgs='podman images'
 alias drun='podman run'
@@ -34,9 +37,10 @@ alias dnet='podman network'
 alias dvol='podman volume'
 
 # SQL Server
-alias mssql="docker run -e ACCEPT_EULA=Y -e SA_PASSWORD=${MSSQL_PASSWORD:-LaravelWow1986!} -p 1433:1433 mcr.microsoft.com/mssql/server:2017-latest"
+alias mssql='docker run -e ACCEPT_EULA=Y -e SA_PASSWORD="${MSSQL_PASSWORD:?Set MSSQL_PASSWORD env var}" -p 1433:1433 mcr.microsoft.com/mssql/server:2017-latest'
 
 # Git
+alias g="git"
 alias gs="git status"
 alias gb="git branch"
 alias gc="git checkout"

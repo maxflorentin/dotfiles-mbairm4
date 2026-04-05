@@ -33,8 +33,10 @@ zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 zstyle ':completion:*' use-cache on
 zstyle ':completion:*' cache-path "$HOME/.zcompcache"
 
-# Vi mode
-bindkey -v
+# Key bindings (emacs mode - default)
+bindkey -e
+bindkey '^[[A' history-beginning-search-backward   # Arrow up
+bindkey '^[[B' history-beginning-search-forward     # Arrow down
 
 # Environment
 export LC_ALL=en_US.UTF-8
@@ -50,7 +52,11 @@ source "$DOTFILES/path.zsh"
 source "$DOTFILES/aliases.zsh"
 
 # Autojump
-[ -f "${AUTOJUMP_PROFILE:-/opt/homebrew/etc/profile.d/autojump.sh}" ] && . "${AUTOJUMP_PROFILE:-/opt/homebrew/etc/profile.d/autojump.sh}"
+if [ -f /opt/homebrew/etc/profile.d/autojump.sh ]; then
+    . /opt/homebrew/etc/profile.d/autojump.sh
+elif [ -f /usr/share/autojump/autojump.zsh ]; then
+    . /usr/share/autojump/autojump.zsh
+fi
 
 # Syntax highlighting
 if [[ "$(uname)" == "Darwin" ]]; then
