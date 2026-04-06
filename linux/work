@@ -31,11 +31,13 @@ cmd_connect() {
 
     if [ -n "$client" ]; then
         _validate_client_name "$client"
+        work-tracker start "$client" "$project" "mac" 2>/dev/null || true
         if [ -n "$project" ]; then
             _ssh "~/.dotfiles/linux/tmux-layout '$client' '$project'"
         else
             _ssh "~/.dotfiles/linux/tmux-layout '$client'"
         fi
+        work-tracker stop "$client" "$project" "mac" 2>/dev/null || true
     else
         _ssh "tmux attach 2>/dev/null || tmux new -s main"
     fi
@@ -349,6 +351,41 @@ cmd_watch() {
     done
 }
 
+cmd_report() {
+    local period="${1:---week}"
+    local local_log="${XDG_DATA_HOME:-$HOME/.local/share}/work-tracker/log.tsv"
+    local tmp="/tmp/work-tracker-merged-$$.tsv"
+
+    # Header
+    printf 'timestamp\tevent\tclient\tproject\tsource\n' > "$tmp"
+
+    # Local log
+    [ -f "$local_log" ] && tail -n +2 "$local_log" >> "$tmp"
+
+    # Pi log (merge if reachable)
+    local pi_log
+    pi_log=$(_ssh_quiet "cat ~/.local/share/work-tracker/log.tsv 2>/dev/null") || true
+    if [ -n "$pi_log" ]; then
+        echo "$pi_log" | tail -n +2 >> "$tmp"
+    fi
+
+    # Sort and deduplicate
+    local sorted="/tmp/work-tracker-sorted-$$.tsv"
+    printf 'timestamp\tevent\tclient\tproject\tsource\n' > "$sorted"
+    tail -n +2 "$tmp" | sort -t"$(printf '\t')" -k1,1n | uniq >> "$sorted"
+
+    WORK_TRACKER_LOG="$sorted" work-tracker report "$period"
+    rm -f "$tmp" "$sorted"
+}
+
+cmd_tracker_status() {
+    echo "=== Local ==="
+    work-tracker status
+    echo ""
+    echo "=== Pi ==="
+    _ssh_quiet "~/.local/bin/work-tracker status 2>/dev/null" || echo "  (unreachable)"
+}
+
 cmd_help() {
     echo "work - Manage freelance workspaces on Pi"
     echo ""
@@ -365,10 +402,13 @@ cmd_help() {
     echo "  work vpn-down <client>    Stop client VPN"
     echo "  work destroy <client>     Delete all client data"
     echo ""
+    echo "Time tracking:"
+    echo "  work report [--day|--week|--month]  Hours per client"
+    echo "  work tracker-status                 Active tracking sessions"
+    echo ""
     echo "Config (env vars):"
     echo "  WORK_PI_HOST      Pi hostname (default: pi-workstation)"
     echo "  WORK_PI_USER      Pi username (default: max)"
-    echo "  WORK_PROXY_PORT   SOCKS proxy port (default: 1080)"
 }
 
 case "${1:-}" in
@@ -383,5 +423,7 @@ case "${1:-}" in
     vpn-up)       shift; cmd_vpn_up "$@" ;;
     vpn-down)     shift; cmd_vpn_down "$@" ;;
     destroy)      shift; cmd_destroy "$@" ;;
+    report)       shift; cmd_report "$@" ;;
+    tracker-status) cmd_tracker_status ;;
     *)            cmd_help ;;
 esac
