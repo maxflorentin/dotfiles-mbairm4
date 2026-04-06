@@ -92,7 +92,7 @@ fi
 # Check if value is multiline
 if echo "$VALUE" | grep -q $'\n'; then
     # Encode multiline values in base64 for safe storage
-    ENCODED_VALUE=$(echo "$VALUE" | base64)
+    ENCODED_VALUE=$(echo "$VALUE" | base64 | tr -d '\n')
     STORE_VALUE="base64:${ENCODED_VALUE}"
     IS_MULTILINE=true
 else
