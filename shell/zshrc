@@ -35,8 +35,10 @@ zstyle ':completion:*' cache-path "$HOME/.zcompcache"
 
 # Key bindings (emacs mode - default)
 bindkey -e
-bindkey '^[[A' history-beginning-search-backward   # Arrow up
-bindkey '^[[B' history-beginning-search-forward     # Arrow down
+bindkey '^[[A' history-beginning-search-backward   # Arrow up (xterm)
+bindkey '^[[B' history-beginning-search-forward     # Arrow down (xterm)
+bindkey '^[OA' history-beginning-search-backward    # Arrow up (tmux)
+bindkey '^[OB' history-beginning-search-forward     # Arrow down (tmux)
 
 # Environment
 export LC_ALL=en_US.UTF-8
