@@ -29,7 +29,7 @@ fi
 mkdir -p "$DEST"
 
 echo "Fetching repos for $ORG..."
-repos=$(gh repo list "$ORG" --limit 200 --json name,sshUrl,isArchived --jq '.[] | select(.isArchived == false) | .name + " " + .sshUrl')
+repos=$(gh repo list "$ORG" --limit 1000 --json name,url,isArchived --jq '.[] | select(.isArchived == false) | .name + " " + .url')
 
 if [ -z "$repos" ]; then
     echo "No repos found (or no access). Try: gh auth login"
@@ -46,7 +46,7 @@ echo "$repos" | while read -r name url; do
         git -C "$DEST/$name" pull --ff-only 2>/dev/null || true
     else
         echo "[$count/$total] $name (cloning)"
-        git clone "$url" "$DEST/$name" 2>/dev/null
+        git clone "$url" "$DEST/$name" 2>/dev/null || echo "  (failed, skipping)"
     fi
 done
 
