@@ -69,6 +69,7 @@ alias ev='envy-list'
 alias evl='envy-load'
 alias evs='envy-set'
 alias evg='envy-get'
+alias evn='envy-new'
 alias evrm='envy-rm'
 alias evsw='envy-switch'
 
