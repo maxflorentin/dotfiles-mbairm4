@@ -74,9 +74,8 @@ if [ "$OS" = "Linux" ]; then
     ln -sf "$DOTFILES/linux/work" "$HOME/.local/bin/work"
 
     # work-tracker pulse cron (every 5 min, logs active tmux sessions)
-    local cron_job="*/5 * * * * $HOME/.local/bin/work-tracker pulse >/dev/null 2>&1"
     if ! crontab -l 2>/dev/null | grep -qF "work-tracker pulse"; then
-        (crontab -l 2>/dev/null; echo "$cron_job") | crontab -
+        (crontab -l 2>/dev/null; echo "*/5 * * * * $HOME/.local/bin/work-tracker pulse >/dev/null 2>&1") | crontab -
         echo "  linux: tmux, tmux-layout, work cli, time-tracker cron"
     else
         echo "  linux: tmux, tmux-layout, work cli, time-tracker cron (exists)"
