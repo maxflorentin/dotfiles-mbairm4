@@ -1,7 +1,7 @@
 # Shortcuts
 alias copyssh="pbcopy < $HOME/.ssh/id_ed25519.pub"
 alias reloadshell="exec zsh"
-alias dotpull='git -C ~/.dotfiles pull && git -C ~/dotfiles pull 2>/dev/null; exec zsh'
+alias dotpull='git -C ~/.dotfiles pull; exec zsh'
 alias reloaddns="dscacheutil -flushcache && sudo killall -HUP mDNSResponder"
 alias l="eza -l --group-directories-first --icons"
 alias ll="eza -la --group-directories-first --icons --git"
@@ -61,18 +61,8 @@ alias wip="commit wip"
 alias compile="commit 'compile'"
 alias version="commit 'version'"
 
-# Jira
-alias jira-fields='jira_get_fields.py'
-alias jira-create='jira_create_ticket.py'
-alias jira-md2adf='markdown_to_jira_adf.py'
-alias jira-merge='jira_merge_json.py'
-alias jira-ticket="pbpaste | jira-create"
-
-# Patent
-alias patent='patent_verifier.py'
-
 # SQLit
-alias sqlit-conn='sqlit-add-connection.sh'
+alias sqlit-conn='sqlit-add-connection'
 
 # Envy (encrypted secrets)
 alias ev='envy-list'

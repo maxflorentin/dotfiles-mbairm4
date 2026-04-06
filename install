@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# install: Set up dotfiles symlinks and config
+# Idempotent - safe to run multiple times
+# Detects macOS vs Linux and applies platform-specific config
+
+set -e
+
+DOTFILES="$(cd "$(dirname "$0")" && pwd)"
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+echo "dotfiles install ($OS/$ARCH)"
+echo "  from: $DOTFILES"
+echo ""
+
+# === Common (all platforms) ===
+
+# Shell
+ln -sfn "$DOTFILES/shell/zshrc" "$HOME/.zshrc"
+
+# Git
+ln -sfn "$DOTFILES/.gitignore_global" "$HOME/.gitignore_global"
+git config --global core.excludesfile "$HOME/.gitignore_global"
+
+# Neovim
+mkdir -p "$HOME/.config"
+ln -sfn "$DOTFILES/editors/nvim" "$HOME/.config/nvim"
+
+# Scripts → ~/.local/bin
+mkdir -p "$HOME/.local/bin"
+
+# Envy scripts
+if [ -d "$DOTFILES/scripts/envy" ]; then
+    for s in "$DOTFILES/scripts/envy"/envy-*; do
+        [ -f "$s" ] && ln -sf "$s" "$HOME/.local/bin/$(basename "$s")"
+    done
+fi
+
+# Standalone scripts
+for s in gh-clone-org brew-sync uv-setup xam-digest sqlit-add-connection; do
+    [ -f "$DOTFILES/scripts/$s" ] && ln -sf "$DOTFILES/scripts/$s" "$HOME/.local/bin/$s"
+done
+
+echo "  common: shell, nvim, scripts"
+
+# === macOS ===
+if [ "$OS" = "Darwin" ]; then
+    # VS Code settings
+    VSCODE_DIR="$HOME/Library/Application Support/Code/User"
+    if [ -d "$VSCODE_DIR" ]; then
+        ln -sf "$DOTFILES/editors/vscode/settings.json" "$VSCODE_DIR/settings.json"
+        echo "  macos: vscode"
+    fi
+
+    # Mackup
+    ln -sf "$DOTFILES/macos/mackup.cfg" "$HOME/.mackup.cfg"
+
+    # work CLI (manage Pi from Mac)
+    ln -sf "$DOTFILES/linux/work" "$HOME/.local/bin/work"
+
+    echo "  macos: mackup, work cli"
+    echo ""
+    echo "Fresh Mac? Run: $DOTFILES/macos/fresh.sh"
+fi
+
+# === Linux ===
+if [ "$OS" = "Linux" ]; then
+    # tmux
+    ln -sfn "$DOTFILES/linux/tmux.conf" "$HOME/.tmux.conf"
+
+    # tmux-layout + work CLI
+    ln -sf "$DOTFILES/linux/tmux-layout" "$HOME/.local/bin/tmux-layout"
+    ln -sf "$DOTFILES/linux/work" "$HOME/.local/bin/work"
+
+    echo "  linux: tmux, tmux-layout, work cli"
+
+    if [ "$ARCH" = "aarch64" ]; then
+        echo ""
+        echo "Pi detected. Fresh setup? Run: $DOTFILES/linux/bootstrap.sh"
+    fi
+fi
+
+echo ""
+echo "Done. Reload: exec zsh"

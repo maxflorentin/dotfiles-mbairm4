@@ -1,51 +1,60 @@
-# Load environment variables
-if [ -f "./.env" ]; then
-  source "./.env"
-fi
+#!/bin/bash
+
+# fresh.sh: Set up a new Mac from scratch
+# Run after cloning dotfiles to ~/.dotfiles/
+
+set -e
+
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+
+# Load env vars if available
+[ -f "$DOTFILES/.env" ] && source "$DOTFILES/.env"
 
 echo "Setting up your Mac..."
+echo ""
 
-# Check if Xcode Command Line Tools are installed
+# Xcode CLI Tools
 if ! xcode-select -p &>/dev/null; then
-  echo "Xcode Command Line Tools not found. Installing..."
-  xcode-select --install
+    echo "Installing Xcode Command Line Tools..."
+    xcode-select --install
+    echo "Re-run this script after Xcode tools finish installing."
+    exit 0
 else
-  echo "Xcode Command Line Tools already installed."
+    echo "Xcode CLI Tools: installed"
 fi
 
-# Check for Oh My Zsh and install if we don't have it
-if [ ! -d "$HOME/.oh-my-zsh" ]; then
-  /bin/sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/HEAD/tools/install.sh)"
+# Homebrew
+if ! command -v brew &>/dev/null; then
+    echo "Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> "$HOME/.zprofile"
+    eval "$(/opt/homebrew/bin/brew shellenv)"
 else
-  echo "Oh My Zsh already installed."
+    echo "Homebrew: installed"
 fi
 
-# Check for Homebrew and install if we don't have it
-if test ! $(which brew); then
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-  echo 'eval "$(${HOMEBREW_PREFIX:-/opt/homebrew}/bin/brew shellenv)"' >> $HOME/.zprofile
-  eval "$(${HOMEBREW_PREFIX:-/opt/homebrew}/bin/brew shellenv)"
-fi
-
-# Removes .zshrc from $HOME (if it exists) and symlinks the .zshrc file from the .dotfiles
-rm -rf $HOME/.zshrc
-ln -sw $HOME/.dotfiles/.zshrc $HOME/.zshrc
-
-# Update Homebrew recipes
+# Brew bundle
+echo "Installing Homebrew packages..."
 brew update
+brew bundle --file "$DOTFILES/macos/Brewfile"
 
-# Install all our dependencies with bundle (See Brewfile)
-brew bundle --file ./Brewfile
+# Run the common install script (symlinks, nvim, scripts)
+"$DOTFILES/install"
 
-# Set default MySQL root password and auth type
-
-# Symlink the Mackup config file to the home directory
-if [ ! -f "$HOME/.mackup.cfg" ]; then
-  ln -s ./.mackup.cfg $HOME/.mackup.cfg
-else
-  echo "Mackup config file already symlinked."
+# Mackup restore (if synced)
+if command -v mackup &>/dev/null && [ -f "$HOME/.mackup.cfg" ]; then
+    echo ""
+    echo "Mackup is ready. Run 'mackup restore' to restore app preferences."
 fi
 
-# Set macOS preferences - we will run this last because this will reload the shell
-source ./.macos
+# macOS defaults
+if [ -f "$DOTFILES/macos/defaults.sh" ]; then
+    echo ""
+    read -p "Apply macOS defaults? (y/n): " apply_defaults
+    if [ "$apply_defaults" = "y" ]; then
+        source "$DOTFILES/macos/defaults.sh"
+    fi
+fi
+
+echo ""
+echo "Mac setup complete. Restart your terminal: exec zsh"

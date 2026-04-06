@@ -1,11 +1,11 @@
 #!/bin/bash
 # brew-sync: Dump current brew state to Brewfile and commit if changed
-# Scheduled via cron: 0 20 * * * ~/Scripts/dotfiles/brew-sync
+# Scheduled via cron: 0 20 * * * ~/.dotfiles/scripts/brew-sync
 
 set -euo pipefail
 
 DOTFILES="$HOME/.dotfiles"
-BREWFILE="$DOTFILES/Brewfile"
+BREWFILE="$DOTFILES/macos/Brewfile"
 LOG="$HOME/.claude/logs/brew-sync.log"
 
 mkdir -p "$(dirname "$LOG")"

@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
 # Load environment variables
-DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [ -f "$DOTFILES_DIR/.env" ]; then
   source "$DOTFILES_DIR/.env"
 fi
 
-# Thanks to Mathias Bynens!
-# ~/.macos — https://mths.be/macos
+# macOS defaults — based on https://mths.be/macos
 
 # Close any open System Preferences panes, to prevent them from overriding
 # settings we’re about to change
@@ -16,7 +15,7 @@ osascript -e 'tell application "System Preferences" to quit'
 # Ask for the administrator password upfront
 sudo -v
 
-# Keep-alive: update existing `sudo` time stamp until `.macos` has finished
+# Keep-alive: update existing `sudo` time stamp until defaults.sh has finished
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
 ###############################################################################

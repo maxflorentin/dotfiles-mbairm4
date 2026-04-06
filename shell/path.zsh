@@ -5,18 +5,15 @@ add_to_path() {
   fi
 }
 
-# Load dotfiles binaries
-add_to_path "$DOTFILES/bin"
+# Local bin (envy, scripts symlinks)
+add_to_path "$HOME/.local/bin"
+
+# Dotfiles scripts
+add_to_path "$DOTFILES/scripts"
 
 # Load global Node installed binaries
 add_to_path "${NODE_BIN:-$HOME/.node/bin}"
 add_to_path "node_modules/.bin"
-
-# Local bin (pipx, envy symlinks, etc.)
-add_to_path "$HOME/.local/bin"
-
-# Dotfiles scripts (jira, patent, etc.)
-add_to_path "$HOME/Scripts/dotfiles"
 
 # Antigravity
 add_to_path "${ANTIGRAVITY_BIN:-$HOME/.antigravity/antigravity/bin}"

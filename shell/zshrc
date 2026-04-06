@@ -48,8 +48,8 @@ if [[ "$(uname)" == "Darwin" ]]; then
 fi
 
 # Load dotfiles config
-source "$DOTFILES/path.zsh"
-source "$DOTFILES/aliases.zsh"
+source "$DOTFILES/shell/path.zsh"
+source "$DOTFILES/shell/aliases.zsh"
 
 # Autojump
 if [ -f /opt/homebrew/etc/profile.d/autojump.sh ]; then
@@ -93,7 +93,7 @@ auto_activate_venv
 
 # UV setup (lazy)
 uv-up() {
-    source "${UV_SETUP_SCRIPT:-$HOME/Scripts/uv_setup.sh}"
+    source "${UV_SETUP_SCRIPT:-$DOTFILES/scripts/uv-setup}"
 }
 
 # AWS profile switcher
@@ -111,7 +111,7 @@ unasp() {
 }
 
 # Starship prompt
-export STARSHIP_CONFIG="$DOTFILES/starship.toml"
+export STARSHIP_CONFIG="$DOTFILES/shell/starship.toml"
 eval "$(starship init zsh)"
 
 # Google Cloud SDK

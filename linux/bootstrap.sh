@@ -1,31 +1,29 @@
 #!/bin/bash
 
-# pi-bootstrap: Set up Raspberry Pi 400 as isolated freelance dev server
-# Run this ON the Pi after fresh Raspberry Pi OS Lite (64-bit) install
-# Usage: curl -sL <raw-url> | bash  OR  scp this file to Pi and run it
+# bootstrap: Set up Raspberry Pi (or Linux ARM) as dev server
+# Run ON the target machine after fresh OS install
+# Usage: curl -sL <raw-url> | bash  OR  scp + run locally
 
 set -e
 
-echo "=== Pi 400 Dev Server Bootstrap ==="
+echo "=== Linux Dev Server Bootstrap ==="
 echo ""
 
-# Fail if not on ARM64
-if [ "$(uname -m)" != "aarch64" ]; then
-    echo "This script is for Raspberry Pi (aarch64). Aborting."
-    exit 1
-fi
+ARCH="$(uname -m)"
+DOTFILES_DIR="$HOME/.dotfiles"
+DOTFILES_REPO="https://github.com/maxflorentin/dotfiles.git"
 
-# Fix locale
+# --- Locale ---
 echo "[1/9] Configuring locale..."
-sudo locale-gen en_US.UTF-8
-sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+sudo locale-gen en_US.UTF-8 2>/dev/null || true
+sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 2>/dev/null || true
 export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
-# Update system
+# --- System update ---
 echo "[2/9] Updating system..."
 sudo apt-get update -qq && sudo apt-get upgrade -y -qq
 
-# Core tools
+# --- Core packages ---
 echo "[3/9] Installing core packages..."
 sudo apt-get install -y -qq \
     git curl wget unzip \
@@ -34,123 +32,81 @@ sudo apt-get install -y -qq \
     openssh-server \
     wireguard openresolv \
     age \
-    jq ripgrep fd-find bat fzf \
+    jq ripgrep fd-find bat fzf eza autojump \
     zsh
 
-# Docker (lightweight, CE for ARM)
+# --- Docker ---
 echo "[4/9] Installing Docker..."
 if ! command -v docker &>/dev/null; then
     curl -fsSL https://get.docker.com | sh
     sudo usermod -aG docker "$USER"
+else
+    echo "  already installed"
 fi
 
-# Node via fnm (fast, low overhead)
+# --- Node via fnm ---
 echo "[5/9] Installing Node (via fnm)..."
 if ! command -v fnm &>/dev/null; then
     curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
     export PATH="$HOME/.local/share/fnm:$PATH"
     eval "$(fnm env)"
     fnm install --lts
+else
+    echo "  already installed"
 fi
 
-# Python (system python3 + uv)
+# --- Python (uv) ---
 echo "[6/9] Installing Python tools..."
 if ! command -v uv &>/dev/null; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
+else
+    echo "  already installed"
 fi
 
-# Neovim (latest stable from GitHub releases)
+# --- Neovim ---
 echo "[7/9] Installing Neovim..."
 if ! command -v nvim &>/dev/null; then
-    NVIM_VERSION="v0.11.6"
-    curl -LO "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-arm64.tar.gz"
-    sudo tar xzf nvim-linux-arm64.tar.gz -C /opt/
-    sudo ln -sf /opt/nvim-linux-arm64/bin/nvim /usr/local/bin/nvim
-    rm nvim-linux-arm64.tar.gz
+    if [ "$ARCH" = "aarch64" ]; then
+        NVIM_VERSION="v0.11.6"
+        curl -LO "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-arm64.tar.gz"
+        sudo tar xzf nvim-linux-arm64.tar.gz -C /opt/
+        sudo ln -sf /opt/nvim-linux-arm64/bin/nvim /usr/local/bin/nvim
+        rm nvim-linux-arm64.tar.gz
+    else
+        sudo apt-get install -y -qq neovim
+    fi
+else
+    echo "  already installed"
 fi
 
-# Starship prompt
+# --- Starship prompt ---
 echo "[8/9] Installing Starship..."
 if ! command -v starship &>/dev/null; then
     curl -sS https://starship.rs/install.sh | sh -s -- -y
+else
+    echo "  already installed"
 fi
 
-# Envy (age-encrypted secrets)
-echo "[9/9] Setting up envy + dotfiles..."
+# --- Dotfiles ---
+echo "[9/9] Setting up dotfiles..."
 
-# Clone dotfiles
-DOTFILES_DIR="$HOME/dotfiles"
-if [ ! -d "$DOTFILES_DIR" ]; then
-    git clone https://github.com/maxflorentin/dotfiles.git "$DOTFILES_DIR"
+if [ -d "$DOTFILES_DIR" ]; then
+    echo "  pulling latest..."
+    git -C "$DOTFILES_DIR" pull
+else
+    git clone "$DOTFILES_REPO" "$DOTFILES_DIR"
 fi
 
-# Link envy scripts
-mkdir -p "$HOME/.local/bin"
-for script in "$DOTFILES_DIR/scripts/envy"/envy-*; do
-    name=$(basename "$script")
-    ln -sf "$script" "$HOME/.local/bin/$name"
-done
+# Run the unified install script
+"$DOTFILES_DIR/install"
 
-# Link nvim config
-mkdir -p "$HOME/.config"
-ln -sf "$DOTFILES_DIR/nvim/config" "$HOME/.config/nvim"
-
-# Set up zsh as default shell
+# Set zsh as default shell
 if [ "$SHELL" != "$(which zsh)" ]; then
     chsh -s "$(which zsh)"
 fi
 
-# Create minimal .zshrc for Pi
-cat > "$HOME/.zshrc" << 'ZSHRC'
-# History
-HISTFILE=~/.zsh_history
-HISTSIZE=50000
-SAVEHIST=50000
-setopt EXTENDED_HISTORY SHARE_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS
-
-# Directory navigation
-setopt AUTO_CD AUTO_PUSHD PUSHD_IGNORE_DUPS PUSHD_SILENT
-
-# Completion
-autoload -Uz compinit && compinit -C
-zstyle ':completion:*' menu select
-zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
-
-# Vi mode
-bindkey -v
-
-# Environment
-export EDITOR="nvim"
-export PATH="$HOME/.local/bin:$HOME/.local/share/fnm:$PATH"
-
-# fnm (Node version manager)
-command -v fnm &>/dev/null && eval "$(fnm env)"
-
-# Aliases
-alias vim=nvim
-alias k=kubectl
-alias docker=podman 2>/dev/null || true
-alias gs="git status"
-alias gb="git branch"
-alias gc="git checkout"
-alias gl="git log --oneline --decorate --color"
-alias gd="git diff"
-alias push="git push"
-alias pull="git pull"
-alias ev='envy-list'
-alias evl='envy-load'
-alias evs='envy-set'
-alias evg='envy-get'
-
-# Starship
-eval "$(starship init zsh)"
-ZSHRC
-
-# Create clients directory structure
+# Create clients directory
 mkdir -p "$HOME/clients"
-
-# Link tmux config from dotfiles
-ln -sf "$DOTFILES_DIR/pi-workstation/.tmux.conf" "$HOME/.tmux.conf"
 
 echo ""
 echo "=== Bootstrap complete ==="
@@ -160,5 +116,5 @@ echo "  1. Log out and back in (or: exec zsh)"
 echo "  2. Initialize envy: envy-init && envy-new work"
 echo "  3. From your Mac: work connect"
 echo ""
-echo "Clients dir: ~/clients/"
-echo "Dotfiles: ~/dotfiles/"
+echo "Dotfiles: ~/.dotfiles/"
+echo "Clients:  ~/clients/"
