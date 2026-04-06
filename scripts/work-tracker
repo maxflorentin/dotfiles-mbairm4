@@ -3,10 +3,14 @@
 # Usage:
 #   work-tracker start <client> [project] [source]
 #   work-tracker stop  <client> [project] [source]
+#   work-tracker pulse                              # cron: log active tmux sessions
 #   work-tracker status
 #   work-tracker report [--day|--week|--month|--all]
 
 set -e
+
+PULSE_INTERVAL=300  # 5 minutes — must match cron schedule
+IDLE_THRESHOLD=300  # seconds since last tmux input to consider idle
 
 LOG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/work-tracker"
 LOG_FILE="$LOG_DIR/log.tsv"
@@ -36,21 +40,56 @@ cmd_stop() {
     _log_event "stop" "$client" "$project" "$source"
 }
 
+# pulse: called by cron every 5 min on Pi
+# Checks each tmux session's last activity and logs a "tick" if active
+cmd_pulse() {
+    command -v tmux >/dev/null 2>&1 || return 0
+    local now
+    now=$(date +%s)
+
+    tmux list-sessions -F '#{session_name} #{session_activity}' 2>/dev/null | while read -r session last_activity; do
+        # Skip generic sessions
+        [ "$session" = "main" ] && continue
+
+        local idle=$((now - last_activity))
+        if [ "$idle" -lt "$IDLE_THRESHOLD" ]; then
+            _log_event "tick" "$session" "" "pi"
+        fi
+    done
+}
+
 cmd_status() {
-    awk -F'\t' -v now="$(date +%s)" '
+    # Show sessions with recent ticks (last 10 min) or open start events
+    local now
+    now=$(date +%s)
+    local cutoff=$((now - 600))
+
+    awk -F'\t' -v now="$now" -v cutoff="$cutoff" '
     NR==1 { next }
     {
         key = $3 ($4 ? "/"$4 : "")
-        events[key] = $2; ts[key] = $1; src[key] = $5
+        # Track start/stop state
+        if ($2 == "start") { active[key] = $1; src[key] = $5 }
+        if ($2 == "stop") { delete active[key] }
+        # Track recent ticks
+        if ($2 == "tick" && $1 >= cutoff) { ticked[key] = $1; tsrc[key] = $5 }
     }
     END {
         found = 0
-        for (k in events) {
-            if (events[k] == "start") {
-                elapsed = now - ts[k]
+        # Show ticked sessions (real activity)
+        for (k in ticked) {
+            elapsed = now - ticked[k]
+            m = int(elapsed / 60)
+            printf "%s (%s) — active %dm ago\n", k, tsrc[k], m
+            found = 1
+        }
+        # Show connected but idle sessions
+        for (k in active) {
+            if (!(k in ticked)) {
+                elapsed = now - active[k]
                 h = int(elapsed / 3600)
                 m = int((elapsed % 3600) / 60)
-                printf "%s (%s) — %dh%02dm\n", k, src[k], h, m
+                printf "%s (%s) — connected %dh%02dm (idle)\n", k, src[k], h, m
                 found = 1
             }
         }
@@ -72,42 +111,58 @@ cmd_report() {
         *) echo "Usage: work-tracker report [--day|--week|--month|--all]"; exit 1 ;;
     esac
 
-    # Accept LOG_FILE override (for merged reports)
     local file="${WORK_TRACKER_LOG:-$LOG_FILE}"
 
-    awk -F'\t' -v cutoff="$cutoff" -v now="$now" '
+    awk -F'\t' -v cutoff="$cutoff" -v now="$now" -v interval='"$PULSE_INTERVAL"' '
     NR==1 { next }
     $1 < cutoff { next }
     {
         key = $3 ($4 ? "/"$4 : "")
-        if ($2 == "start") {
+        if ($2 == "tick") {
+            # Each tick = PULSE_INTERVAL seconds of active work
+            ticks[key]++
+        } else if ($2 == "start") {
             starts[key] = $1
         } else if ($2 == "stop" && starts[key]) {
-            total[key] += $1 - starts[key]
+            connected[key] += $1 - starts[key]
             delete starts[key]
         }
     }
     END {
-        for (k in starts) total[k] += now - starts[k]
-        printf "%-24s %8s\n", "CLIENT", "HOURS"
-        printf "%-24s %8s\n", "------------------------", "--------"
-        grand = 0
+        # Count still-open connections
+        for (k in starts) connected[k] += now - starts[k]
+
+        printf "%-24s %8s %10s\n", "CLIENT", "ACTIVE", "CONNECTED"
+        printf "%-24s %8s %10s\n", "------------------------", "--------", "----------"
+        grand_active = 0
+        grand_conn = 0
         n = 0
-        for (k in total) {
-            hours = total[k] / 3600
-            grand += hours
-            lines[n++] = sprintf("%-24s %7.1fh", k, hours)
+        for (k in ticks) {
+            active_h = (ticks[k] * 300) / 3600
+            conn_h = (k in connected) ? connected[k] / 3600 : 0
+            grand_active += active_h
+            grand_conn += conn_h
+            lines[n++] = sprintf("%-24s %7.1fh %9.1fh", k, active_h, conn_h)
+            # Remove from connected so we can print connect-only clients after
+            delete connected[k]
+        }
+        # Clients with connection time but no ticks (Mac-only, no Pi pulse)
+        for (k in connected) {
+            conn_h = connected[k] / 3600
+            grand_conn += conn_h
+            lines[n++] = sprintf("%-24s %8s %9.1fh", k, "-", conn_h)
         }
         for (i = 0; i < n; i++) print lines[i]
-        printf "%-24s %8s\n", "------------------------", "--------"
-        printf "%-24s %7.1fh\n", "TOTAL", grand
+        printf "%-24s %8s %10s\n", "------------------------", "--------", "----------"
+        printf "%-24s %7.1fh %9.1fh\n", "TOTAL", grand_active, grand_conn
     }' "$file"
 }
 
 case "${1:-}" in
     start)   shift; cmd_start "$@" ;;
     stop)    shift; cmd_stop "$@" ;;
+    pulse)   cmd_pulse ;;
     status)  cmd_status ;;
     report)  shift; cmd_report "$@" ;;
-    *)       echo "work-tracker: start|stop|status|report [--day|--week|--month|--all]" ;;
+    *)       echo "work-tracker: start|stop|pulse|status|report [--day|--week|--month|--all]" ;;
 esac
