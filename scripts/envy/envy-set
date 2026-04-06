@@ -27,7 +27,8 @@ if [ "$1" = "-c" ]; then
 fi
 
 KEY="$1"
-VALUE="$2"
+shift
+VALUE="$*"
 
 # If no value provided, get it from clipboard or prompt
 if [ -z "$VALUE" ]; then
