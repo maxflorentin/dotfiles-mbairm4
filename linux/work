@@ -86,6 +86,12 @@ CLIENTRC
     echo "  venv:  ~/$CLIENTS_DIR/$client/.venv"
     echo "  kube:  ~/$CLIENTS_DIR/$client/.kube/"
     echo ""
+
+    # Generate SSH key for client
+    echo "Setting up SSH key..."
+    cmd_ssh_keygen "$client"
+
+    echo ""
     echo "Connect with: work connect $client"
 }
 
@@ -401,7 +407,7 @@ cmd_ssh_keygen() {
 
     _ssh "
         set -e
-        mkdir -p ~/.ssh && chmod 700 ~/.ssh
+        mkdir -p ~/.ssh/config.d && chmod 700 ~/.ssh ~/.ssh/config.d
 
         # Generate key if it doesn't exist
         if [ -f ~/.ssh/$key_name ]; then
@@ -411,10 +417,8 @@ cmd_ssh_keygen() {
             echo 'Key generated: ~/.ssh/$key_name'
         fi
 
-        # Add Host block to ssh config if not present
-        if ! grep -q 'Host $ssh_alias' ~/.ssh/config 2>/dev/null; then
-            cat >> ~/.ssh/config << SSHCONF
-
+        # Write client SSH config fragment (idempotent)
+        cat > ~/.ssh/config.d/$client << SSHCONF
 # $client ($host)
 Host $ssh_alias
     HostName $host
@@ -422,10 +426,15 @@ Host $ssh_alias
     IdentityFile ~/.ssh/$key_name
     IdentitiesOnly yes
 SSHCONF
+        chmod 600 ~/.ssh/config.d/$client
+        echo 'SSH config: ~/.ssh/config.d/$client'
+
+        # Ensure Include line in ~/.ssh/config
+        if ! grep -q 'Include config.d/\\*' ~/.ssh/config 2>/dev/null; then
+            { echo 'Include config.d/*'; cat ~/.ssh/config 2>/dev/null; } > ~/.ssh/config.tmp
+            mv ~/.ssh/config.tmp ~/.ssh/config
             chmod 600 ~/.ssh/config
-            echo 'SSH config updated: Host $ssh_alias'
-        else
-            echo 'SSH config already has: Host $ssh_alias'
+            echo 'Added Include config.d/* to ~/.ssh/config'
         fi
 
         echo ''
@@ -451,7 +460,7 @@ cmd_help() {
     echo ""
     echo "Commands:"
     echo "  work connect [client] [project]  SSH + tmux (fuzzy project match)"
-    echo "  work setup <client>       Create new client workspace"
+    echo "  work setup <client>       Create client workspace + SSH key"
     echo "  work status               Show Pi status, VPNs, sessions"
     echo "  work health               Quick health check with alerts"
     echo "  work watch [seconds]      Live monitor (default: 30s)"

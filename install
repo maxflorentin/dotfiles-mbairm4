@@ -81,6 +81,21 @@ if [ "$OS" = "Linux" ]; then
         echo "  linux: tmux, tmux-layout, work cli, time-tracker cron (exists)"
     fi
 
+    # Ensure SSH config.d Include (recovers client SSH configs after re-clone)
+    mkdir -p "$HOME/.ssh/config.d" && chmod 700 "$HOME/.ssh" "$HOME/.ssh/config.d" 2>/dev/null
+    if [ -f "$HOME/.ssh/config" ]; then
+        if ! grep -q 'Include config.d/\*' "$HOME/.ssh/config" 2>/dev/null; then
+            { echo 'Include config.d/*'; cat "$HOME/.ssh/config"; } > "$HOME/.ssh/config.tmp"
+            mv "$HOME/.ssh/config.tmp" "$HOME/.ssh/config"
+            chmod 600 "$HOME/.ssh/config"
+            echo "  linux: ssh config.d Include (added)"
+        fi
+    else
+        echo 'Include config.d/*' > "$HOME/.ssh/config"
+        chmod 600 "$HOME/.ssh/config"
+        echo "  linux: ssh config.d Include (created)"
+    fi
+
     # Ensure sshd is running and enabled (critical for remote access)
     if command -v systemctl &>/dev/null; then
         if ! systemctl is-active --quiet sshd 2>/dev/null && ! systemctl is-active --quiet ssh 2>/dev/null; then
