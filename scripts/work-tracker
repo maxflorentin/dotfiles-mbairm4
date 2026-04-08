@@ -107,8 +107,11 @@ cmd_report() {
         --day)   cutoff=$((now - 86400)) ;;
         --week)  cutoff=$((now - 604800)) ;;
         --month) cutoff=$((now - 2592000)) ;;
+        --cal)   cutoff=$(date -d "$(date +%Y-%m-01)" +%s 2>/dev/null || date -j -f "%Y-%m-%d" "$(date +%Y-%m)-01" +%s) ;;
+        --prev)  cutoff=$(date -d "$(date -d '1 month ago' +%Y-%m-01)" +%s 2>/dev/null || date -j -v-1m -f "%Y-%m-%d" "$(date +%Y-%m)-01" +%s)
+                 now=$(date -d "$(date +%Y-%m-01)" +%s 2>/dev/null || date -j -f "%Y-%m-%d" "$(date +%Y-%m)-01" +%s) ;;
         --all)   cutoff=0 ;;
-        *) echo "Usage: work-tracker report [--day|--week|--month|--all]"; exit 1 ;;
+        *) echo "Usage: work-tracker report [--day|--week|--month|--cal|--prev|--all]"; exit 1 ;;
     esac
 
     local file="${WORK_TRACKER_LOG:-$LOG_FILE}"
@@ -158,11 +161,32 @@ cmd_report() {
     }' "$file"
 }
 
+cmd_monthly_save() {
+    local report_dir="$LOG_DIR/reports"
+    local prev_month
+    prev_month=$(date -d '1 month ago' +%Y-%m 2>/dev/null || date -j -v-1m +%Y-%m)
+    local report_file="$report_dir/$prev_month.txt"
+
+    mkdir -p "$report_dir"
+    if [ -f "$report_file" ]; then
+        echo "Report already exists: $report_file"
+        return 0
+    fi
+
+    {
+        echo "=== Work Report: $prev_month ==="
+        echo ""
+        cmd_report --prev
+    } > "$report_file"
+    echo "Saved: $report_file"
+}
+
 case "${1:-}" in
-    start)   shift; cmd_start "$@" ;;
-    stop)    shift; cmd_stop "$@" ;;
-    pulse)   cmd_pulse ;;
-    status)  cmd_status ;;
-    report)  shift; cmd_report "$@" ;;
-    *)       echo "work-tracker: start|stop|pulse|status|report [--day|--week|--month|--all]" ;;
+    start)        shift; cmd_start "$@" ;;
+    stop)         shift; cmd_stop "$@" ;;
+    pulse)        cmd_pulse ;;
+    status)       cmd_status ;;
+    report)       shift; cmd_report "$@" ;;
+    monthly-save) cmd_monthly_save ;;
+    *)            echo "work-tracker: start|stop|pulse|status|report|monthly-save" ;;
 esac

@@ -79,7 +79,12 @@
       "Bash(ssh encryption_user@pi-workstation 'sudo wipefs -a /dev/sda && echo \"wiped\" && sudo parted /dev/sda --script mklabel gpt && echo \"gpt label\" && sudo parted /dev/sda --script mkpart swap linux-swap 1MiB 4GiB && echo \"swap partition\" && sudo parted /dev/sda --script mkpart home ext4 4GiB 100% && echo \"home partition\" && sudo parted /dev/sda --script print')",
       "Bash(ssh max@pi-workstation 'echo \"encryption_user ALL=\\(ALL\\) NOPASSWD: ALL\" | sudo tee /etc/sudoers.d/encryption_user && echo \"done\"')",
       "Bash(ssh encryption_user@pi-workstation 'sudo loginctl kill-user max 2>/dev/null; sleep 2; echo \"max killed\"; lsblk /dev/sda')",
-      "Bash(ssh encryption_user@pi-workstation 'sudo mkswap /dev/sda1 && echo \"swap OK\" && sudo mkfs.ext4 -L home /dev/sda2 && echo \"ext4 OK\"')"
+      "Bash(ssh encryption_user@pi-workstation 'sudo mkswap /dev/sda1 && echo \"swap OK\" && sudo mkfs.ext4 -L home /dev/sda2 && echo \"ext4 OK\"')",
+      "Bash(ssh max@pi-workstation 'sudo rm -rf /home.old && echo \"old home deleted\" && sudo userdel --remove encryption_user 2>/dev/null; sudo rm -f /etc/sudoers.d/encryption_user /etc/ssh/authorized_keys/encryption_user && echo \"encryption_user removed\"')",
+      "Bash(ssh encryption_user@pi-workstation 'echo test' 2>&1; ssh max@pi-workstation 'sudo rm -rf /home.old 2>&1; ls /home.old 2>&1 || echo \"cleaned\"')",
+      "Bash(ssh max@pi-workstation 'sudo reboot' 2>&1; echo \"reboot sent\")",
+      "Bash(ssh max@pi-workstation 'sudo rm -rf /home.old && echo \"cleaned\" || echo \"still busy\"')",
+      "Bash(ssh max@pi-workstation 'sudo systemctl enable wazuh-agent && sudo systemctl start wazuh-agent && sudo systemctl is-active wazuh-agent')"
     ]
   }
 }
