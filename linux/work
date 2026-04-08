@@ -21,6 +21,10 @@ _ssh() {
     ssh -t "$PI_USER@$PI_HOST" "$@"
 }
 
+_ssh_tty() {
+    ssh -tt "$PI_USER@$PI_HOST" "$@"
+}
+
 _ssh_quiet() {
     ssh -o ConnectTimeout=3 "$PI_USER@$PI_HOST" "$@" 2>/dev/null
 }
@@ -33,13 +37,13 @@ cmd_connect() {
         _validate_client_name "$client"
         work-tracker start "$client" "$project" "mac" 2>/dev/null || true
         if [ -n "$project" ]; then
-            _ssh "~/.dotfiles/linux/tmux-layout '$client' '$project'"
+            _ssh_tty "~/.dotfiles/linux/tmux-layout '$client' '$project'"
         else
-            _ssh "~/.dotfiles/linux/tmux-layout '$client'"
+            _ssh_tty "~/.dotfiles/linux/tmux-layout '$client'"
         fi
         work-tracker stop "$client" "$project" "mac" 2>/dev/null || true
     else
-        _ssh "tmux attach 2>/dev/null || tmux new -s main"
+        _ssh_tty "tmux attach 2>/dev/null || tmux new -s main"
     fi
 }
 
@@ -71,13 +75,30 @@ cmd_setup() {
         fi
 
         # Client profile (sourced by tmux-layout, VS Code, etc.)
-        cat > ~/$CLIENTS_DIR/$client/.clientrc << CLIENTRC
+        if [ ! -f ~/$CLIENTS_DIR/$client/.clientrc ]; then
+            cat > ~/$CLIENTS_DIR/$client/.clientrc << CLIENTRC
+# $client client environment
+# Sourced automatically by tmux-layout on connect
+
+# --- Secrets (via envy) ---
+# eval \\\$(envy-load $client 2>/dev/null)
+
+# --- Cloud & Infra ---
 export AWS_PROFILE=$client
 export CLOUDSDK_ACTIVE_CONFIG_NAME=$client
 export DATABRICKS_CONFIG_PROFILE=$client
 export KUBECONFIG=\\\$HOME/clients/$client/.kube/config
+
+# --- Python venv ---
 [ -f \\\$HOME/clients/$client/.venv/bin/activate ] && source \\\$HOME/clients/$client/.venv/bin/activate
+
+# --- Aliases ---
+# alias k='kubectl'
 CLIENTRC
+            echo '.clientrc created'
+        else
+            echo '.clientrc already exists (skipped)'
+        fi
     "
 
     echo ""

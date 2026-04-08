@@ -14,17 +14,17 @@ DOTFILES_DIR="$HOME/.dotfiles"
 DOTFILES_REPO="https://github.com/maxflorentin/dotfiles.git"
 
 # --- Locale ---
-echo "[1/9] Configuring locale..."
+echo "[1/10] Configuring locale..."
 sudo locale-gen en_US.UTF-8 2>/dev/null || true
 sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 2>/dev/null || true
 export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
 # --- System update ---
-echo "[2/9] Updating system..."
+echo "[2/10] Updating system..."
 sudo apt-get update -qq && sudo apt-get upgrade -y -qq
 
 # --- Core packages ---
-echo "[3/9] Installing core packages..."
+echo "[3/10] Installing core packages..."
 sudo apt-get install -y -qq \
     git curl wget unzip \
     build-essential cmake \
@@ -33,10 +33,11 @@ sudo apt-get install -y -qq \
     wireguard openresolv \
     age \
     jq ripgrep fd-find bat fzf eza autojump \
-    zsh
+    zsh zsh-syntax-highlighting \
+    lsof ecryptfs-utils
 
 # --- Docker ---
-echo "[4/9] Installing Docker..."
+echo "[4/10] Installing Docker..."
 if ! command -v docker &>/dev/null; then
     curl -fsSL https://get.docker.com | sh
     sudo usermod -aG docker "$USER"
@@ -44,19 +45,26 @@ else
     echo "  already installed"
 fi
 
-# --- Node via fnm ---
-echo "[5/9] Installing Node (via fnm)..."
-if ! command -v fnm &>/dev/null; then
-    curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
-    export PATH="$HOME/.local/share/fnm:$PATH"
-    eval "$(fnm env)"
-    fnm install --lts
+# --- Node (standalone) ---
+echo "[5/10] Installing Node..."
+if ! command -v node &>/dev/null; then
+    NODE_VERSION="v22.15.0"
+    curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-arm64.tar.xz" \
+        | sudo tar -xJ --strip-components=1 -C /usr/local/
 else
-    echo "  already installed"
+    echo "  already installed ($(node --version))"
+fi
+
+# --- Claude Code ---
+echo "[6/10] Installing Claude Code..."
+if ! command -v claude &>/dev/null; then
+    sudo npm install -g @anthropic-ai/claude-code
+else
+    echo "  already installed ($(claude --version 2>/dev/null | head -1))"
 fi
 
 # --- Python (uv) ---
-echo "[6/9] Installing Python tools..."
+echo "[7/10] Installing Python tools..."
 if ! command -v uv &>/dev/null; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
 else
@@ -64,7 +72,7 @@ else
 fi
 
 # --- Neovim ---
-echo "[7/9] Installing Neovim..."
+echo "[8/10] Installing Neovim..."
 if ! command -v nvim &>/dev/null; then
     if [ "$ARCH" = "aarch64" ]; then
         NVIM_VERSION="v0.11.6"
@@ -80,7 +88,7 @@ else
 fi
 
 # --- Starship prompt ---
-echo "[8/9] Installing Starship..."
+echo "[9/10] Installing Starship..."
 if ! command -v starship &>/dev/null; then
     curl -sS https://starship.rs/install.sh | sh -s -- -y
 else
@@ -88,7 +96,7 @@ else
 fi
 
 # --- Dotfiles ---
-echo "[9/9] Setting up dotfiles..."
+echo "[10/10] Setting up dotfiles..."
 
 if [ -d "$DOTFILES_DIR" ]; then
     echo "  pulling latest..."
@@ -108,13 +116,31 @@ fi
 # Create clients directory
 mkdir -p "$HOME/clients"
 
+# --- ecryptfs SSH fix ---
+# When home is encrypted, authorized_keys must live outside ~/
+if dpkg -l ecryptfs-utils 2>/dev/null | grep -q '^ii'; then
+    echo "Configuring SSH for ecryptfs compatibility..."
+    sudo mkdir -p /etc/ssh/authorized_keys
+    if [ -f "$HOME/.ssh/authorized_keys" ]; then
+        sudo cp "$HOME/.ssh/authorized_keys" "/etc/ssh/authorized_keys/$USER"
+        sudo chmod 644 "/etc/ssh/authorized_keys/$USER"
+        sudo chown root:root "/etc/ssh/authorized_keys/$USER"
+    fi
+    if ! grep -q '/etc/ssh/authorized_keys/%u' /etc/ssh/sshd_config 2>/dev/null; then
+        sudo sed -i 's|#\?AuthorizedKeysFile.*|AuthorizedKeysFile /etc/ssh/authorized_keys/%u .ssh/authorized_keys|' /etc/ssh/sshd_config
+        sudo systemctl restart sshd 2>/dev/null || sudo systemctl restart ssh 2>/dev/null || true
+    fi
+fi
+
 echo ""
 echo "=== Bootstrap complete ==="
 echo ""
 echo "Next steps:"
 echo "  1. Log out and back in (or: exec zsh)"
 echo "  2. Initialize envy: envy-init && envy-new work"
-echo "  3. From your Mac: work connect"
+echo "  3. Encrypt home (optional): ecryptfs-migrate-home -u $USER"
+echo "  4. Configure DNS (optional): sudo nano /etc/dnsmasq.d/nextdns.conf"
+echo "  5. From your Mac: work connect"
 echo ""
 echo "Dotfiles: ~/.dotfiles/"
 echo "Clients:  ~/clients/"

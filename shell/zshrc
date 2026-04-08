@@ -40,8 +40,10 @@ zle -N history-beginning-search-backward-end history-search-end
 zle -N history-beginning-search-forward-end history-search-end
 bindkey '^[[A' history-beginning-search-backward-end   # Arrow up (xterm)
 bindkey '^[[B' history-beginning-search-forward-end     # Arrow down (xterm)
-bindkey '^[OA' history-beginning-search-backward-end    # Arrow up (tmux)
-bindkey '^[OB' history-beginning-search-forward-end     # Arrow down (tmux)
+bindkey '^[OA' history-beginning-search-backward-end    # Arrow up (application mode)
+bindkey '^[OB' history-beginning-search-forward-end     # Arrow down (application mode)
+bindkey '^P' history-beginning-search-backward-end      # Ctrl-P fallback
+bindkey '^N' history-beginning-search-forward-end       # Ctrl-N fallback
 
 # Environment
 export LC_ALL=en_US.UTF-8
@@ -115,7 +117,8 @@ unasp() {
   echo "AWS_PROFILE unset."
 }
 
-# Starship prompt
+# Starship prompt (disable venv PS1 manipulation - Starship handles it)
+export VIRTUAL_ENV_DISABLE_PROMPT=1
 export STARSHIP_CONFIG="$DOTFILES/shell/starship.toml"
 eval "$(starship init zsh)"
 

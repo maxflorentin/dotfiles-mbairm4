@@ -67,9 +67,12 @@ tmux split-window -h -t "$SESSION:workspace" -c "$WORK_DIR" -l 35%
 tmux split-window -v -t "$SESSION:workspace.1" -c "$WORK_DIR" -l 40%
 
 # Init all panes
-_pane_init "$SESSION:workspace.0"
-_pane_init "$SESSION:workspace.1"
-_pane_init "$SESSION:workspace.2" "git status 2>/dev/null"
+# Pane 0 (main): tree overview of workspace
+_pane_init "$SESSION:workspace.0" "ls -la"
+# Pane 1 (top-right): recent git log
+_pane_init "$SESSION:workspace.1" "git log --oneline --graph -15 2>/dev/null || ls"
+# Pane 2 (bottom-right): git status
+_pane_init "$SESSION:workspace.2" "git status 2>/dev/null || echo 'No git repo'"
 
 tmux select-pane -t "$SESSION:workspace.0"
 
