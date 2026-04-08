@@ -73,7 +73,13 @@
       "Bash(ssh max@pi-workstation 'cat ~/.config/cship.toml 2>/dev/null || echo \"FILE_NOT_FOUND\"' 2>&1)",
       "Bash(ssh max@pi-workstation 'cat ~/.claude/settings.json 2>/dev/null || echo \"FILE_NOT_FOUND\"' 2>&1)",
       "Bash(ssh max@pi-workstation 'ls -la /etc/ssh/authorized_keys/ 2>&1 || echo \"DIR_NOT_FOUND\"' 2>&1)",
-      "Bash(ssh max@pi-workstation 'cat /etc/ssh/authorized_keys/max' 2>&1)"
+      "Bash(ssh max@pi-workstation 'cat /etc/ssh/authorized_keys/max' 2>&1)",
+      "Bash(ssh max@pi-workstation 'sudo mkdir -p /etc/ssh/authorized_keys && sudo cp /etc/ssh/authorized_keys/max /etc/ssh/authorized_keys/encryption_user 2>/dev/null; echo \"done\"')",
+      "Bash(ssh encryption_user@pi-workstation 'echo \"SSH OK as encryption_user\"' 2>&1)",
+      "Bash(ssh encryption_user@pi-workstation 'sudo wipefs -a /dev/sda && echo \"wiped\" && sudo parted /dev/sda --script mklabel gpt && echo \"gpt label\" && sudo parted /dev/sda --script mkpart swap linux-swap 1MiB 4GiB && echo \"swap partition\" && sudo parted /dev/sda --script mkpart home ext4 4GiB 100% && echo \"home partition\" && sudo parted /dev/sda --script print')",
+      "Bash(ssh max@pi-workstation 'echo \"encryption_user ALL=\\(ALL\\) NOPASSWD: ALL\" | sudo tee /etc/sudoers.d/encryption_user && echo \"done\"')",
+      "Bash(ssh encryption_user@pi-workstation 'sudo loginctl kill-user max 2>/dev/null; sleep 2; echo \"max killed\"; lsblk /dev/sda')",
+      "Bash(ssh encryption_user@pi-workstation 'sudo mkswap /dev/sda1 && echo \"swap OK\" && sudo mkfs.ext4 -L home /dev/sda2 && echo \"ext4 OK\"')"
     ]
   }
 }

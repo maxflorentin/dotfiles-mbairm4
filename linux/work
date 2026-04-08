@@ -262,6 +262,7 @@ cmd_browse() {
     echo "Opening Chrome for client '$client'..."
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
         --proxy-server="socks5://127.0.0.1:$proxy_port" \
+        --host-resolver-rules="MAP * ~NOTFOUND , EXCLUDE 127.0.0.1" \
         --user-data-dir="$chrome_dir" \
         --no-first-run \
         &>/dev/null &
