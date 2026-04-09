@@ -33,6 +33,7 @@ _ssh_data()  { ssh -T  -o ClearAllForwardings=yes "$PI_USER@$PI_HOST" "$@"; }
 _ssh_as()       { local u="$1"; shift; ssh -t  "$u@$PI_HOST" "$@"; }
 _ssh_as_tty()   { local u="$1"; shift; ssh -tt "$u@$PI_HOST" "$@"; }
 _ssh_as_quiet() { local u="$1"; shift; ssh -o ConnectTimeout=3 "$u@$PI_HOST" "$@" 2>/dev/null; }
+_ssh_as_data()  { local u="$1"; shift; ssh -T  -o ClearAllForwardings=yes "$u@$PI_HOST" "$@"; }
 
 # List client users on the Pi (all human users except $PI_USER)
 _list_clients() {
@@ -80,7 +81,7 @@ cmd_user_create() {
     echo ""
 
     # Phase 1: admin-side ops (useradd, SSH keys, dotfiles clone + install)
-    _ssh "sudo DOTFILES_REPO='$DOTFILES_REPO' PI_USER='$PI_USER' CLIENT='$client' bash -s" <<'REMOTE'
+    _ssh_data "sudo DOTFILES_REPO='$DOTFILES_REPO' PI_USER='$PI_USER' CLIENT='$client' bash -s" <<'REMOTE'
 set -e
 
 if id "$CLIENT" &>/dev/null; then
@@ -111,7 +112,8 @@ if [ ! -d "/home/$CLIENT/.dotfiles" ]; then
 fi
 
 # Run install as the client user (symlinks zshrc, tmux conf, fastfetch, crons, etc.)
-sudo -u "$CLIENT" bash -lc "cd ~/.dotfiles && ./install" || true
+# Use -H so HOME is set to /home/$CLIENT; use absolute paths to avoid ~ expansion issues.
+sudo -u "$CLIENT" -H bash -lc "cd /home/$CLIENT/.dotfiles && bash ./install" || true
 REMOTE
 
     echo ""
@@ -119,7 +121,7 @@ REMOTE
     echo ""
 
     # Phase 2: client-side ops (run as the new user)
-    _ssh_as "$client" "bash -s" <<'CLIENT_INIT'
+    _ssh_as_data "$client" "bash -s" <<'CLIENT_INIT'
 set -e
 
 # Install uv if not already present for this user
@@ -196,7 +198,7 @@ cmd_vpn_up() {
     fi
 
     echo "Starting VPN for $client..."
-    _ssh "sudo wg-quick up -- '$client'"
+    _ssh_data "sudo wg-quick up -- '$client'"
     echo "VPN active."
 }
 
@@ -207,7 +209,7 @@ cmd_vpn_down() {
         exit 1
     fi
     _validate_client_name "$client"
-    _ssh "sudo wg-quick down -- '$client'" 2>/dev/null || true
+    _ssh_data "sudo wg-quick down -- '$client'" 2>/dev/null || true
     echo "VPN stopped for $client"
 }
 
@@ -275,7 +277,7 @@ cmd_destroy() {
         exit 0
     fi
 
-    _ssh "sudo CLIENT='$client' bash -s" <<'REMOTE'
+    _ssh_data "sudo CLIENT='$client' bash -s" <<'REMOTE'
 set -e
 
 # Kill any running processes for this user
