@@ -1,0 +1,78 @@
+// fastfetch config for Pi workstation
+// Used by `work status` — includes work-specific modules (tmux, clients, VPN)
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "source": "raspbian",
+    "padding": {
+      "top": 1,
+      "right": 3
+    }
+  },
+  "display": {
+    "separator": "  "
+  },
+  "modules": [
+    "title",
+    "separator",
+    "os",
+    "host",
+    "kernel",
+    "uptime",
+    "packages",
+    "shell",
+    {
+      "type": "cpu",
+      "showPeCoreCount": false
+    },
+    {
+      "type": "memory",
+      "format": "{used} / {total} ({percentage})"
+    },
+    {
+      "type": "swap"
+    },
+    {
+      "type": "disk",
+      "folders": "/:/home"
+    },
+    {
+      "type": "localip",
+      "showIpv4": true,
+      "showIpv6": false
+    },
+    {
+      "type": "command",
+      "key": "Temp",
+      "text": "awk '{printf \"%d°C\", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 'n/a'"
+    },
+    {
+      "type": "command",
+      "key": "Load",
+      "text": "awk '{print $1, $2, $3}' /proc/loadavg"
+    },
+    "break",
+    {
+      "type": "command",
+      "key": "Docker",
+      "text": "c=$(docker ps --format '{{.Names}}' 2>/dev/null | paste -sd ', '); echo ${c:-none}"
+    },
+    {
+      "type": "command",
+      "key": "VPN",
+      "text": "v=$(sudo -n wg show 2>/dev/null | awk '/^interface:/{printf \"%s \", $2}' | sed 's/ $//'); echo ${v:-none}"
+    },
+    {
+      "type": "command",
+      "key": "Tmux",
+      "text": "t=$(tmux list-sessions 2>/dev/null | awk -F: '{printf \"%s \", $1}' | sed 's/ $//'); echo ${t:-none}"
+    },
+    {
+      "type": "command",
+      "key": "Clients",
+      "text": "c=$(ls -1 ~/clients/ 2>/dev/null | paste -sd ', '); echo ${c:-none}"
+    },
+    "break",
+    "colors"
+  ]
+}

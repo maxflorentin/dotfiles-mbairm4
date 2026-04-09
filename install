@@ -69,6 +69,10 @@ if [ "$OS" = "Linux" ]; then
     # tmux
     ln -sfn "$DOTFILES/linux/tmux.conf" "$HOME/.tmux.conf"
 
+    # fastfetch (used by `work status`)
+    mkdir -p "$HOME/.config/fastfetch"
+    ln -sfn "$DOTFILES/linux/fastfetch.jsonc" "$HOME/.config/fastfetch/config.jsonc"
+
     # tmux-layout + work CLI
     ln -sf "$DOTFILES/linux/tmux-layout" "$HOME/.local/bin/tmux-layout"
     ln -sf "$DOTFILES/linux/work" "$HOME/.local/bin/work"

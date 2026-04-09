@@ -2,8 +2,8 @@
 
 # gh-clone-org: Clone all repos from a GitHub org/user
 # Usage: gh-clone-org <org> [destination] [--ssh-host alias]
-#   gh-clone-org MuttData .
-#   gh-clone-org MuttData . --ssh-host github.com-mutt
+#   gh-clone-org acme-org .
+#   gh-clone-org acme-org . --ssh-host github.com-acme
 
 set -e
 
@@ -29,9 +29,9 @@ if [ -z "$ORG" ]; then
     echo "  --ssh-host <alias>  Use SSH host alias from ~/.ssh/config"
     echo ""
     echo "Examples:"
-    echo "  gh-clone-org MuttData ."
-    echo "  gh-clone-org MuttData . --filter mixilo"
-    echo "  gh-clone-org MuttData . --filter 'spark|airflow' --ssh-host github.com-mutt"
+    echo "  gh-clone-org acme-org ."
+    echo "  gh-clone-org acme-org . --filter my-repo"
+    echo "  gh-clone-org acme-org . --filter 'spark|airflow' --ssh-host github.com-acme"
     exit 1
 fi
 

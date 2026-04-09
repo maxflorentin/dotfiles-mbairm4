@@ -2,7 +2,7 @@
 
 # tmux-layout: Create a workspace layout for a client session
 # Usage: tmux-layout <client> [project]
-#   client  - client name (e.g. mutt)
+#   client  - client name (e.g. acme)
 #   project - fuzzy project name (e.g. "cdc" matches "spark-cdc")
 
 set -e

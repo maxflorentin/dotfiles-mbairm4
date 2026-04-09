@@ -29,6 +29,11 @@ _ssh_quiet() {
     ssh -o ConnectTimeout=3 "$PI_USER@$PI_HOST" "$@" 2>/dev/null
 }
 
+# Data-gathering SSH: no PTY, no port forwardings (avoids LocalForward spam)
+_ssh_data() {
+    ssh -T -o ClearAllForwardings=yes "$PI_USER@$PI_HOST" "$@"
+}
+
 cmd_connect() {
     local client="${1:-}"
     local project="${2:-}"
@@ -159,39 +164,30 @@ cmd_vpn_down() {
 }
 
 cmd_status() {
-    echo "=== Pi Status ==="
-    echo ""
-
     # Check connectivity
     if ! _ssh_quiet "echo ok" >/dev/null; then
         echo "Pi is offline or unreachable at $PI_HOST"
         exit 1
     fi
 
-    _ssh 'bash -s' <<'REMOTE'
-        echo "Host: $(hostname)"
-        echo "Uptime: $(uptime -p 2>/dev/null || uptime | sed 's/.*up //')"
-        echo ""
-
-        echo "Memory:"
-        free -h | grep Mem | awk '{printf "  Used: %s / %s (free: %s)\n", $3, $2, $4}'
-        echo ""
-
-        echo "Docker:"
-        docker ps --format "  {{.Names}}: {{.Status}}" 2>/dev/null || echo "  (not running)"
-        echo ""
-
-        echo "VPN:"
-        sudo wg show 2>/dev/null | grep "interface" | awk '{print "  " $2 ": active"}' || echo "  (none active)"
-        echo ""
-
-        echo "Tmux sessions:"
-        tmux list-sessions 2>/dev/null | sed 's/^/  /' || echo "  (none)"
-        echo ""
-
-        echo "Clients:"
-        ls -1 ~/clients/ 2>/dev/null | sed 's/^/  /' || echo "  (none)"
+    # Use fastfetch if available, fallback to plain text
+    if _ssh_quiet "command -v fastfetch" >/dev/null; then
+        _ssh_data "fastfetch"
+    else
+        _ssh_data 'bash -s' <<'REMOTE'
+            echo "=== Pi Status (install fastfetch for a nicer view: sudo apt install fastfetch) ==="
+            echo ""
+            echo "Host:    $(hostname)"
+            echo "Uptime:  $(uptime -p 2>/dev/null || uptime | sed 's/.*up //')"
+            free -h | awk '/^Mem/{printf "Memory:  %s / %s\n", $3, $2}'
+            df -h / | awk 'NR==2{printf "Disk:    %s / %s (%s)\n", $3, $2, $5}'
+            echo ""
+            echo "Docker:  $(docker ps --format '{{.Names}}' 2>/dev/null | paste -sd ', ' || echo none)"
+            echo "VPN:     $(sudo -n wg show 2>/dev/null | awk '/^interface:/{printf "%s ", $2}' || echo none)"
+            echo "Tmux:    $(tmux list-sessions 2>/dev/null | awk -F: '{printf "%s ", $1}' || echo none)"
+            echo "Clients: $(ls -1 ~/clients/ 2>/dev/null | paste -sd ', ' || echo none)"
 REMOTE
+    fi
 }
 
 cmd_sync() {
@@ -416,9 +412,9 @@ cmd_ssh_keygen() {
         echo "Generates an SSH key for a client on the Pi and configures ~/.ssh/config"
         echo ""
         echo "Examples:"
-        echo "  work ssh-keygen mutt                 # github.com (default)"
-        echo "  work ssh-keygen mutt gitlab.com"
-        echo "  work ssh-keygen mutt bitbucket.org"
+        echo "  work ssh-keygen acme                 # github.com (default)"
+        echo "  work ssh-keygen acme gitlab.com"
+        echo "  work ssh-keygen acme bitbucket.org"
         exit 1
     fi
 

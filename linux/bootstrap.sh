@@ -34,7 +34,8 @@ sudo apt-get install -y -qq \
     age \
     jq ripgrep fd-find bat fzf eza autojump \
     zsh zsh-syntax-highlighting \
-    lsof ecryptfs-utils
+    lsof ecryptfs-utils \
+    fastfetch
 
 # --- Docker ---
 echo "[4/10] Installing Docker..."
