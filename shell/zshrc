@@ -73,6 +73,8 @@ elif [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; th
 fi
 
 # Auto-activate Python venvs
+# Must be set BEFORE any venv is activated so deactivate never clobbers PS1
+export VIRTUAL_ENV_DISABLE_PROMPT=1
 autoload -U add-zsh-hook
 
 auto_activate_venv() {
@@ -117,11 +119,12 @@ unasp() {
   echo "AWS_PROFILE unset."
 }
 
-# Starship prompt (disable venv PS1 manipulation - Starship handles it)
-export VIRTUAL_ENV_DISABLE_PROMPT=1
+# Starship prompt
 export STARSHIP_CONFIG="$DOTFILES/shell/starship.toml"
 eval "$(starship init zsh)"
 
 # Google Cloud SDK
 if [ -f "$HOME/Projects/gcp/google-cloud-sdk/path.zsh.inc" ]; then . "$HOME/Projects/gcp/google-cloud-sdk/path.zsh.inc"; fi
 if [ -f "$HOME/Projects/gcp/google-cloud-sdk/completion.zsh.inc" ]; then . "$HOME/Projects/gcp/google-cloud-sdk/completion.zsh.inc"; fi
+
+. "$HOME/.local/bin/env"
