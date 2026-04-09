@@ -13,7 +13,7 @@ set -e
 
 PI_HOST="${WORK_PI_HOST:-pi-workstation}"
 PI_USER="${WORK_PI_USER:-max}"
-DOTFILES_REPO="${WORK_DOTFILES_REPO:-https://github.com/maxflorentin/dotfiles.git}"
+DOTFILES_REPO="${WORK_DOTFILES_REPO:-https://github.com/maxflorentin/dotfiles-mbairm4.git}"
 
 _validate_client_name() {
     local name="$1"
@@ -105,10 +105,15 @@ if [ ! -f "/etc/ssh/authorized_keys/$CLIENT" ]; then
     echo "  authorized_keys seeded from $PI_USER"
 fi
 
-# Clone dotfiles as the client user
+# Clone dotfiles as the client user.
+# If the dir exists but is missing `install` (stale/partial clone), nuke and re-clone.
+if [ -d "/home/$CLIENT/.dotfiles" ] && [ ! -f "/home/$CLIENT/.dotfiles/install" ]; then
+    echo "  removing stale dotfiles clone (missing ./install)"
+    rm -rf "/home/$CLIENT/.dotfiles"
+fi
 if [ ! -d "/home/$CLIENT/.dotfiles" ]; then
     sudo -u "$CLIENT" git clone "$DOTFILES_REPO" "/home/$CLIENT/.dotfiles"
-    echo "  dotfiles cloned"
+    echo "  dotfiles cloned from $DOTFILES_REPO"
 fi
 
 # Run install as the client user (symlinks zshrc, tmux conf, fastfetch, crons, etc.)

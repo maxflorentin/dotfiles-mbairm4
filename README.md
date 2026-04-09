@@ -5,7 +5,7 @@ Cross-platform dotfiles for macOS and Linux (Raspberry Pi).
 ## Quick start
 
 ```bash
-git clone git@github.com:maxflorentin/dotfiles.git ~/.dotfiles
+git clone git@github.com:maxflorentin/dotfiles-mbairm4.git ~/.dotfiles
 cd ~/.dotfiles
 ./install
 ```

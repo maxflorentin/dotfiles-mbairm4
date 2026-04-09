@@ -11,7 +11,7 @@ echo ""
 
 ARCH="$(uname -m)"
 DOTFILES_DIR="$HOME/.dotfiles"
-DOTFILES_REPO="https://github.com/maxflorentin/dotfiles.git"
+DOTFILES_REPO="https://github.com/maxflorentin/dotfiles-mbairm4.git"
 
 # --- Locale ---
 echo "[1/10] Configuring locale..."
