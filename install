@@ -101,15 +101,15 @@ if [ "$OS" = "Linux" ]; then
         echo "  linux: ssh config.d Include (created)"
     fi
 
-    # Ensure sshd is running and enabled (critical for remote access)
-    if command -v systemctl &>/dev/null; then
+    # Ensure sshd is running and enabled (admin only — skipped for non-sudoer client users)
+    if command -v systemctl &>/dev/null && sudo -n true 2>/dev/null; then
         if ! systemctl is-active --quiet sshd 2>/dev/null && ! systemctl is-active --quiet ssh 2>/dev/null; then
             echo "  WARNING: sshd is not running! Starting..."
-            sudo systemctl start sshd 2>/dev/null || sudo systemctl start ssh 2>/dev/null || true
+            sudo -n systemctl start sshd 2>/dev/null || sudo -n systemctl start ssh 2>/dev/null || true
         fi
         systemctl is-enabled --quiet sshd 2>/dev/null || systemctl is-enabled --quiet ssh 2>/dev/null || {
             echo "  WARNING: sshd not enabled at boot! Enabling..."
-            sudo systemctl enable sshd 2>/dev/null || sudo systemctl enable ssh 2>/dev/null || true
+            sudo -n systemctl enable sshd 2>/dev/null || sudo -n systemctl enable ssh 2>/dev/null || true
         }
     fi
 

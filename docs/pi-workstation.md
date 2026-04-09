@@ -3,31 +3,48 @@
 Headless dev server for isolated freelance workspaces.
 Client traffic stays on the server. Your Mac stays clean.
 
+## Isolation model (multi-user)
+
+**One Linux user on the Pi per client.**
+
+```
+/home/max/         admin user — dotfiles, VPN configs, compliance tooling
+/home/<client1>/   client user — own dotfiles clone, venv, envy, work-tracker log
+/home/<client2>/   ...
+```
+
+Per-user homes (`chmod 700`) give you OS-level aisolation between clients. `ps`, `find`, `rg` from one client's session cannot see another client's data. `work connect <client>` SSHes **as that client user** — the client name and the Linux user are the same.
+
+Admin ops (`useradd`, VPN up/down, Wazuh config) still run as `max` via `sudo`.
+
 ## Components
 
 | File | Runs on | Description |
 |------|---------|-------------|
-| `linux/bootstrap.sh` | Server | Installs the full stack (Docker, Node, Claude Code, Neovim, Starship, etc.) |
-| `linux/work` | Mac + Pi | CLI to manage workspaces, VPNs, sessions, and monitoring |
-| `linux/tmux-layout` | Server | Creates per-client tmux workspace layouts |
-| `linux/tmux.conf` | Server | Minimal tmux theme (Pure/Starship style) |
+| `linux/bootstrap.sh` | Server | Installs the full stack (Docker, Node, Claude Code, Neovim, Starship, fastfetch, etc.) |
+| `linux/work` | Mac | CLI to manage workspaces, VPNs, sessions, and monitoring |
+| `linux/tmux-layout` | Server | Per-user tmux workspace layout (derives client from `$USER`) |
+| `linux/tmux.conf` | Server | Minimal tmux theme with active-pane purple border |
+| `linux/fastfetch.jsonc` | Server | `work status` dashboard config |
+| `scripts/work-tracker` | Both | Time tracking (per-user log) |
 
 ## `work` CLI
 
 ```bash
-work connect [client] [project]  # SSH + tmux (fuzzy project match)
-work setup <client>              # Create workspace + envy context + .clientrc
-work status                      # Server status (RAM, Docker, VPNs, sessions)
-work health                      # Quick health check with alerts
-work watch [seconds]             # Live monitor (default: 30s)
-work sync <client> [dir]         # Rsync local dir to server
-work browse <client>             # Isolated Chrome via SOCKS proxy
-work browse-stop                 # Stop SOCKS proxy
-work vpn-up <client>             # Start client WireGuard VPN
-work vpn-down <client>           # Stop client VPN
-work ssh-keygen <client> [host]  # Generate ed25519 key for client
-work report [--day|--week|--month] # Time tracking report
-work destroy <client>            # Delete all client data
+work connect [client] [project]   # SSH as client + tmux (fuzzy project match)
+work user-create <client>         # Create dedicated Linux user + dotfiles + envy + venv
+work status                       # fastfetch-style Pi dashboard
+work health                       # Quick health check with alerts
+work watch [seconds]              # Live monitor (default: 30s)
+work sync <client> [dir] [sub]    # Rsync local dir to client's home
+work browse <client>              # Chrome routed via Pi network/VPN
+work browse-stop [client]         # Stop SOCKS proxy
+work vpn-up <client>              # Start client WireGuard VPN
+work vpn-down <client>            # Stop client VPN
+work ssh-keygen <client> [host]   # Generate ed25519 key in client's home
+work destroy <client>             # userdel -r + cleanup SSH keys + VPN config
+work report [--day|--week|--month|--cal|--prev|--all]
+work tracker-status               # Active sessions (Mac + each client)
 ```
 
 ## Setup
@@ -39,24 +56,22 @@ work destroy <client>            # Delete all client data
 
 ## Post-Bootstrap
 
-### Home encryption (ecryptfs)
-
-Optional but recommended for client data isolation:
+### Home encryption (ecryptfs) — for compliance-heavy clients only
 
 ```bash
-# Create encryption user first
+# Create temporary encryption user (sudoer)
 sudo useradd -mb /home -s /bin/bash -G sudo encryption_user
 sudo passwd encryption_user
 
 # Log out, log in as encryption_user, then:
-sudo ecryptfs-migrate-home -u max
+sudo ecryptfs-migrate-home -u <client>
 
-# Log out, log in as max, verify files, then cleanup:
+# Log out, log in as <client>, verify files, then cleanup:
 sudo userdel --remove encryption_user
-sudo rm -rf /home/max.*
+sudo rm -rf /home/<client>.*
 ```
 
-The bootstrap script automatically handles the SSH authorized_keys fix for ecryptfs (moves keys to `/etc/ssh/authorized_keys/%u` so SSH works before home is mounted).
+The bootstrap script automatically handles the SSH `authorized_keys` fix for ecryptfs (moves keys to `/etc/ssh/authorized_keys/%u` so SSH works before home is mounted).
 
 Save the recovery key: `ecryptfs-unwrap-passphrase ~/.ecryptfs/wrapped-passphrase`
 
@@ -76,9 +91,20 @@ sudo systemctl restart dnsmasq
 echo "nameserver 127.0.0.1" | sudo tee /etc/resolv.conf
 ```
 
-### Compliance tools (client-specific)
+### Compliance tools (per client)
 
-Some clients require additional security software. These are NOT part of the standard bootstrap:
+Some clients require additional security software. These are NOT part of the standard bootstrap.
+
+**Critical: scope Wazuh to a single client's home**, or it will see everything on the box:
+
+```xml
+<!-- /var/ossec/etc/ossec.conf -->
+<syscheck>
+  <directories check_all="yes" realtime="yes">/home/<client></directories>
+</syscheck>
+```
+
+After editing: `sudo systemctl restart wazuh-agent`
 
 ```bash
 # ClamAV (antivirus)
@@ -86,48 +112,63 @@ sudo apt install -y clamav clamav-daemon
 sudo freshclam && sudo systemctl enable clamav-daemon
 
 # Wazuh agent (SIEM) — follow client-provided installer
-
 # Tailscale (VPN mesh) — follow client instructions for auth key
 ```
 
 ## Client Onboarding
 
 ```bash
-# From Mac — creates dirs, envy context, venv, .clientrc template:
-work setup <client>
+# From Mac — creates Linux user, clones dotfiles, installs, sets up envy/venv/.clientrc:
+work user-create <client>
 
-# Connect and customize .clientrc:
+# Generate an SSH key (for the client's GitHub/GitLab):
+work ssh-keygen <client>
+
+# Connect and customize:
 work connect <client>
-vim ~/clients/<client>/.clientrc
+vim ~/.clientrc    # now lives in client's home, not under ~/clients/
 ```
 
-Each client gets: isolated directory, envy secrets, Python venv, .clientrc (env vars + aliases), optional .kube/config and WireGuard VPN.
+Each client gets:
+- Dedicated Linux user with home `chmod 700`
+- Own dotfiles clone at `~/.dotfiles`
+- Own Python venv at `~/.venv`
+- Own envy context with age-encrypted secrets
+- Own `.clientrc` (env vars + aliases)
+- Own `~/.local/share/work-tracker/log.tsv` (isolated time tracking)
+- Own cron for `work-tracker pulse`
 
 ## VS Code Remote
 
-Install the "Remote - SSH" extension. Connect via `Cmd+Shift+P` > "Remote-SSH: Connect to Host" > `pi-workstation`. Edits, terminal, and extensions run on the server.
+Install the "Remote - SSH" extension. Connect via `Cmd+Shift+P` > "Remote-SSH: Connect to Host" > `<client>@pi-workstation`. The `<client>` prefix picks the right Linux user.
 
 ## Client VPNs
 
-Each client can have its own WireGuard config at `/etc/wireguard/<client>.conf`.
+Each client can have its own WireGuard config at `/etc/wireguard/<client>.conf` (owned by root, managed by admin user).
 
 `work vpn-up` checks for full-tunnel configs (`AllowedIPs = 0.0.0.0/0`) and warns before activation, since routing all traffic through the client VPN would kill your SSH session. Always use split tunneling — only route the client's internal subnets.
+
+## Time tracking
+
+Each client user runs its own `work-tracker pulse` cron every 5 min. `work report` from Mac iterates all client users on the Pi via SSH and merges their logs with the Mac-local log (which tracks Mac → Pi connection start/stop events).
 
 ## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `WORK_PI_HOST` | `pi-workstation` | Server hostname or IP |
-| `WORK_PI_USER` | `max` | SSH user |
-| `WORK_PROXY_PORT` | `1080` | SOCKS proxy port for `browse` |
+| `WORK_PI_USER` | `max` | Admin user on Pi |
+| `WORK_DOTFILES_REPO` | `https://github.com/maxflorentin/dotfiles.git` | Repo cloned into new client homes |
 
 ## Migration
 
-The setup is portable. To move to a new machine (bigger Pi, mini PC, VPS, etc.):
+The setup is portable. To move to a new machine:
 
 1. Run `linux/bootstrap.sh` on the new host
-2. Copy `~/clients/` and `~/.envy/` from old server
-3. Copy WireGuard configs from `/etc/wireguard/`
-4. Update `WORK_PI_HOST` (env var or `~/.ssh/config`)
+2. Recreate each client: `work user-create <client>`
+3. Restore data: rsync each `/home/<client>/` from old host
+4. Copy `~/.envy/` per client (if applicable)
+5. Copy WireGuard configs from `/etc/wireguard/`
+6. Update `WORK_PI_HOST` (env var or `~/.ssh/config`)
 
 Everything else (`work` CLI, tmux layouts, aliases) works unchanged.

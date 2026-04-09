@@ -1,146 +1,195 @@
 #!/bin/bash
 
-# work: Manage freelance workspaces on Raspberry Pi 400
+# work: Manage freelance workspaces on Raspberry Pi (multi-user model)
 # Usage: work <command> [args]
+#
+# Architecture:
+#   - One Linux user on the Pi per client (e.g. /home/mutt, /home/lahuen)
+#   - Admin user (max) owns /etc, shared VPN configs, compliance tooling
+#   - Each client user has their own dotfiles clone, venv, envy, work-tracker log
+#   - This CLI runs on Mac and SSHes as the appropriate user per command
 
 set -e
 
 PI_HOST="${WORK_PI_HOST:-pi-workstation}"
 PI_USER="${WORK_PI_USER:-max}"
-CLIENTS_DIR="clients"
+DOTFILES_REPO="${WORK_DOTFILES_REPO:-https://github.com/maxflorentin/dotfiles.git}"
 
 _validate_client_name() {
     local name="$1"
-    if [[ ! "$name" =~ ^[a-zA-Z][a-zA-Z0-9_-]*$ ]]; then
-        echo "Error: client name must start with a letter (a-z, 0-9, -, _)"
+    if [[ ! "$name" =~ ^[a-z][a-z0-9_-]*$ ]]; then
+        echo "Error: client name must be lowercase (Linux username rules: a-z0-9_-, starting with a letter)"
         exit 1
     fi
 }
 
-_ssh() {
-    ssh -t "$PI_USER@$PI_HOST" "$@"
+# --- Admin SSH helpers (run as $PI_USER, typically "max") ---
+_ssh()       { ssh -t  "$PI_USER@$PI_HOST" "$@"; }
+_ssh_tty()   { ssh -tt "$PI_USER@$PI_HOST" "$@"; }
+_ssh_quiet() { ssh -o ConnectTimeout=3 "$PI_USER@$PI_HOST" "$@" 2>/dev/null; }
+_ssh_data()  { ssh -T  -o ClearAllForwardings=yes "$PI_USER@$PI_HOST" "$@"; }
+
+# --- Client SSH helpers (run as <client>@<pi>) ---
+_ssh_as()       { local u="$1"; shift; ssh -t  "$u@$PI_HOST" "$@"; }
+_ssh_as_tty()   { local u="$1"; shift; ssh -tt "$u@$PI_HOST" "$@"; }
+_ssh_as_quiet() { local u="$1"; shift; ssh -o ConnectTimeout=3 "$u@$PI_HOST" "$@" 2>/dev/null; }
+
+# List client users on the Pi (all human users except $PI_USER)
+_list_clients() {
+    _ssh_quiet "getent passwd | awk -F: '\$3>=1000 && \$1!=\"$PI_USER\" && \$1!=\"nobody\" {print \$1}'"
 }
 
-_ssh_tty() {
-    ssh -tt "$PI_USER@$PI_HOST" "$@"
-}
-
-_ssh_quiet() {
-    ssh -o ConnectTimeout=3 "$PI_USER@$PI_HOST" "$@" 2>/dev/null
-}
-
-# Data-gathering SSH: no PTY, no port forwardings (avoids LocalForward spam)
-_ssh_data() {
-    ssh -T -o ClearAllForwardings=yes "$PI_USER@$PI_HOST" "$@"
-}
-
+# --- connect ---
 cmd_connect() {
     local client="${1:-}"
     local project="${2:-}"
 
-    if [ -n "$client" ]; then
-        _validate_client_name "$client"
-        work-tracker start "$client" "$project" "mac" 2>/dev/null || true
-        if [ -n "$project" ]; then
-            _ssh_tty "~/.dotfiles/linux/tmux-layout '$client' '$project'"
-        else
-            _ssh_tty "~/.dotfiles/linux/tmux-layout '$client'"
-        fi
-        work-tracker stop "$client" "$project" "mac" 2>/dev/null || true
-    else
+    if [ -z "$client" ]; then
+        # No client → connect as admin to a plain tmux session
         _ssh_tty "tmux attach 2>/dev/null || tmux new -s main"
+        return
     fi
+
+    _validate_client_name "$client"
+    work-tracker start "$client" "$project" "mac" 2>/dev/null || true
+    if [ -n "$project" ]; then
+        _ssh_as_tty "$client" "~/.dotfiles/linux/tmux-layout '$project'"
+    else
+        _ssh_as_tty "$client" "~/.dotfiles/linux/tmux-layout"
+    fi
+    work-tracker stop "$client" "$project" "mac" 2>/dev/null || true
 }
 
-cmd_setup() {
+# --- user-create ---
+# Creates a dedicated Linux user for the client on the Pi
+cmd_user_create() {
     local client="$1"
     if [ -z "$client" ]; then
-        echo "Usage: work setup <client-name>"
+        echo "Usage: work user-create <client>"
         echo ""
-        echo "Creates project structure + envy context on Pi"
+        echo "Creates a dedicated Linux user on the Pi with:"
+        echo "  - Home at /home/<client> (mode 700)"
+        echo "  - Dotfiles clone + install"
+        echo "  - SSH authorized_keys seeded from admin's"
+        echo "  - Envy context, .clientrc, Python venv via uv"
         exit 1
     fi
 
     _validate_client_name "$client"
-    echo "Setting up workspace for: $client"
+    echo "Creating user '$client' on Pi..."
     echo ""
 
-    _ssh "
-        # Directory structure
-        mkdir -p ~/$CLIENTS_DIR/$client/.kube
+    # Phase 1: admin-side ops (useradd, SSH keys, dotfiles clone + install)
+    _ssh "sudo DOTFILES_REPO='$DOTFILES_REPO' PI_USER='$PI_USER' CLIENT='$client' bash -s" <<'REMOTE'
+set -e
 
-        # Envy context
-        echo '$client' > ~/$CLIENTS_DIR/$client/.envy-context
-        test -f ~/.envy/keys/$client.key || envy-new $client 2>/dev/null || true
+if id "$CLIENT" &>/dev/null; then
+    echo "  user $CLIENT already exists (skipping useradd)"
+else
+    useradd -m -s /bin/zsh "$CLIENT"
+    chmod 700 "/home/$CLIENT"
+    echo "  user $CLIENT created (home: /home/$CLIENT)"
+fi
 
-        # Python venv via uv
-        cd ~/$CLIENTS_DIR/$client
-        if [ ! -d .venv ]; then
-            ~/.local/bin/uv venv .venv 2>/dev/null && echo 'venv created'
-        fi
+# Seed SSH authorized_keys (ecryptfs-compatible path used by sshd_config)
+mkdir -p /etc/ssh/authorized_keys
+if [ ! -f "/etc/ssh/authorized_keys/$CLIENT" ]; then
+    if [ -f "/etc/ssh/authorized_keys/$PI_USER" ]; then
+        cp "/etc/ssh/authorized_keys/$PI_USER" "/etc/ssh/authorized_keys/$CLIENT"
+    elif [ -f "/home/$PI_USER/.ssh/authorized_keys" ]; then
+        cp "/home/$PI_USER/.ssh/authorized_keys" "/etc/ssh/authorized_keys/$CLIENT"
+    fi
+    chmod 644 "/etc/ssh/authorized_keys/$CLIENT"
+    chown root:root "/etc/ssh/authorized_keys/$CLIENT"
+    echo "  authorized_keys seeded from $PI_USER"
+fi
 
-        # Client profile (sourced by tmux-layout, VS Code, etc.)
-        if [ ! -f ~/$CLIENTS_DIR/$client/.clientrc ]; then
-            cat > ~/$CLIENTS_DIR/$client/.clientrc << CLIENTRC
-# $client client environment
+# Clone dotfiles as the client user
+if [ ! -d "/home/$CLIENT/.dotfiles" ]; then
+    sudo -u "$CLIENT" git clone "$DOTFILES_REPO" "/home/$CLIENT/.dotfiles"
+    echo "  dotfiles cloned"
+fi
+
+# Run install as the client user (symlinks zshrc, tmux conf, fastfetch, crons, etc.)
+sudo -u "$CLIENT" bash -lc "cd ~/.dotfiles && ./install" || true
+REMOTE
+
+    echo ""
+    echo "Phase 2: seeding envy, venv, .clientrc (as $client)..."
+    echo ""
+
+    # Phase 2: client-side ops (run as the new user)
+    _ssh_as "$client" "bash -s" <<'CLIENT_INIT'
+set -e
+
+# Install uv if not already present for this user
+if [ ! -x ~/.local/bin/uv ]; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 || true
+fi
+
+# Envy init + per-client context
+[ -d ~/.envy ] || ~/.local/bin/envy-init 2>/dev/null || true
+[ -f ~/.envy/keys/$USER.key ] || ~/.local/bin/envy-new $USER 2>/dev/null || true
+
+# Python venv
+if [ ! -d ~/.venv ] && [ -x ~/.local/bin/uv ]; then
+    ~/.local/bin/uv venv ~/.venv >/dev/null 2>&1 && echo "  venv created at ~/.venv"
+fi
+
+# Client profile (sourced by tmux-layout)
+if [ ! -f ~/.clientrc ]; then
+    cat > ~/.clientrc <<CLIENTRC
+# $USER client environment
 # Sourced automatically by tmux-layout on connect
 
 # --- Secrets (via envy) ---
-# eval \\\$(envy-load $client 2>/dev/null)
+# eval \$(envy-load $USER 2>/dev/null)
 
 # --- Cloud & Infra ---
-export AWS_PROFILE=$client
-export CLOUDSDK_ACTIVE_CONFIG_NAME=$client
-export DATABRICKS_CONFIG_PROFILE=$client
-export KUBECONFIG=\\\$HOME/clients/$client/.kube/config
+export AWS_PROFILE=$USER
+export CLOUDSDK_ACTIVE_CONFIG_NAME=$USER
+export DATABRICKS_CONFIG_PROFILE=$USER
+export KUBECONFIG=\$HOME/.kube/config
 
 # --- Python venv ---
-[ -f \\\$HOME/clients/$client/.venv/bin/activate ] && source \\\$HOME/clients/$client/.venv/bin/activate
+[ -f \$HOME/.venv/bin/activate ] && source \$HOME/.venv/bin/activate
 
 # --- Aliases ---
 # alias k='kubectl'
 CLIENTRC
-            echo '.clientrc created'
-        else
-            echo '.clientrc already exists (skipped)'
-        fi
-    "
+    echo "  .clientrc created"
+fi
+
+mkdir -p ~/.kube
+CLIENT_INIT
 
     echo ""
-    echo "Workspace ready: ~/$CLIENTS_DIR/$client/"
-    echo "  envy:  $client"
-    echo "  venv:  ~/$CLIENTS_DIR/$client/.venv"
-    echo "  kube:  ~/$CLIENTS_DIR/$client/.kube/"
+    echo "User '$client' ready."
     echo ""
-
-    # Generate SSH key for client
-    echo "Setting up SSH key..."
-    cmd_ssh_keygen "$client"
-
-    echo ""
-    echo "Connect with: work connect $client"
+    echo "Connect with:           work connect $client"
+    echo "Generate SSH key:       work ssh-keygen $client"
+    echo "Encrypt home (compliance): ssh $client@$PI_HOST sudo ecryptfs-migrate-home -u $client"
 }
 
+# --- VPN ---
 cmd_vpn_up() {
     local client="$1"
     if [ -z "$client" ]; then
         echo "Usage: work vpn-up <client-name>"
-        echo "Starts WireGuard VPN for client (config must exist at /etc/wireguard/<client>.conf)"
+        echo "Starts WireGuard VPN for client (config at /etc/wireguard/<client>.conf)"
         exit 1
     fi
 
     _validate_client_name "$client"
 
-    # Check for full tunnel (0.0.0.0/0) which would kill SSH
     local allowed
     allowed=$(_ssh_quiet "sudo grep -i 'AllowedIPs' /etc/wireguard/$client.conf 2>/dev/null")
     if echo "$allowed" | grep -q '0\.0\.0\.0/0'; then
         echo "WARNING: $client.conf routes ALL traffic (AllowedIPs = 0.0.0.0/0)"
         echo "This will kill your SSH connection to the Pi."
         echo ""
-        echo "Edit /etc/wireguard/$client.conf on the Pi and set AllowedIPs"
-        echo "to only the client's internal subnets. Example:"
-        echo "  AllowedIPs = 10.0.0.0/8, 172.16.0.0/12"
+        echo "Edit /etc/wireguard/$client.conf and scope AllowedIPs to the client subnets."
+        echo "Example: AllowedIPs = 10.0.0.0/8, 172.16.0.0/12"
         echo ""
         read -p "Start anyway? (yes/no): " confirm
         [ "$confirm" != "yes" ] && exit 0
@@ -148,7 +197,7 @@ cmd_vpn_up() {
 
     echo "Starting VPN for $client..."
     _ssh "sudo wg-quick up -- '$client'"
-    echo "VPN active. Check with: work status"
+    echo "VPN active."
 }
 
 cmd_vpn_down() {
@@ -157,25 +206,23 @@ cmd_vpn_down() {
         echo "Usage: work vpn-down <client-name>"
         exit 1
     fi
-
     _validate_client_name "$client"
     _ssh "sudo wg-quick down -- '$client'" 2>/dev/null || true
     echo "VPN stopped for $client"
 }
 
+# --- status ---
 cmd_status() {
-    # Check connectivity
     if ! _ssh_quiet "echo ok" >/dev/null; then
         echo "Pi is offline or unreachable at $PI_HOST"
         exit 1
     fi
 
-    # Use fastfetch if available, fallback to plain text
     if _ssh_quiet "command -v fastfetch" >/dev/null; then
         _ssh_data "fastfetch"
     else
         _ssh_data 'bash -s' <<'REMOTE'
-            echo "=== Pi Status (install fastfetch for a nicer view: sudo apt install fastfetch) ==="
+            echo "=== Pi Status (install fastfetch: sudo apt install fastfetch) ==="
             echo ""
             echo "Host:    $(hostname)"
             echo "Uptime:  $(uptime -p 2>/dev/null || uptime | sed 's/.*up //')"
@@ -184,41 +231,43 @@ cmd_status() {
             echo ""
             echo "Docker:  $(docker ps --format '{{.Names}}' 2>/dev/null | paste -sd ', ' || echo none)"
             echo "VPN:     $(sudo -n wg show 2>/dev/null | awk '/^interface:/{printf "%s ", $2}' || echo none)"
-            echo "Tmux:    $(tmux list-sessions 2>/dev/null | awk -F: '{printf "%s ", $1}' || echo none)"
-            echo "Clients: $(ls -1 ~/clients/ 2>/dev/null | paste -sd ', ' || echo none)"
+            echo "Clients: $(getent passwd | awk -F: '$3>=1000 && $1!="nobody" {print $1}' | paste -sd ', ')"
 REMOTE
     fi
 }
 
+# --- sync ---
 cmd_sync() {
     local client="$1"
     local dir="${2:-.}"
+    local target="${3:-$(basename "$(cd "$dir" && pwd)")}"
 
     if [ -z "$client" ]; then
-        echo "Usage: work sync <client-name> [local-dir]"
-        echo "Syncs local dir to Pi client workspace"
+        echo "Usage: work sync <client> [local-dir] [remote-subdir]"
+        echo "Syncs local dir to /home/<client>/<remote-subdir>/"
         exit 1
     fi
+    _validate_client_name "$client"
 
     rsync -avz --exclude '.git' --exclude 'node_modules' --exclude '.venv' --exclude '__pycache__' \
-        "$dir/" "$PI_USER@$PI_HOST:~/$CLIENTS_DIR/$client/"
-    echo "Synced to Pi:~/$CLIENTS_DIR/$client/"
+        "$dir/" "$client@$PI_HOST:~/$target/"
+    echo "Synced to $client@$PI_HOST:~/$target/"
 }
 
+# --- destroy ---
 cmd_destroy() {
     local client="$1"
     if [ -z "$client" ]; then
-        echo "Usage: work destroy <client-name>"
+        echo "Usage: work destroy <client>"
         exit 1
     fi
-
     _validate_client_name "$client"
-    [ -z "$CLIENTS_DIR" ] && { echo "FATAL: CLIENTS_DIR is empty"; exit 1; }
 
-    echo "This will delete ALL data for client '$client' on Pi:"
-    echo "  - ~/$CLIENTS_DIR/$client/"
-    echo "  - envy context '$client'"
-    echo "  - VPN config (if exists)"
+    echo "This will PERMANENTLY delete client '$client' on Pi:"
+    echo "  - Linux user + home (/home/$client)"
+    echo "  - SSH authorized_keys (/etc/ssh/authorized_keys/$client)"
+    echo "  - WireGuard VPN config (if exists)"
+    echo "  - Active tmux sessions"
     echo ""
     read -p "Type 'yes' to confirm: " confirm
     if [ "$confirm" != "yes" ]; then
@@ -226,30 +275,46 @@ cmd_destroy() {
         exit 0
     fi
 
-    _ssh "
-        rm -rf ~/'$CLIENTS_DIR'/'$client'
-        rm -f ~/.envy/'$client'.envy.age ~/.envy/keys/'$client'.key
-        sudo rm -f /etc/wireguard/'$client'.conf
-        tmux kill-session -t '$client' 2>/dev/null || true
-    "
+    _ssh "sudo CLIENT='$client' bash -s" <<'REMOTE'
+set -e
 
-    echo "Workspace '$client' destroyed."
+# Kill any running processes for this user
+pkill -u "$CLIENT" 2>/dev/null || true
+sleep 1
+pkill -9 -u "$CLIENT" 2>/dev/null || true
+
+# Remove user + home
+if id "$CLIENT" &>/dev/null; then
+    userdel -r "$CLIENT" 2>/dev/null || userdel -rf "$CLIENT" 2>/dev/null || true
+    echo "  user $CLIENT removed"
+fi
+
+# Clean up SSH keys
+rm -f "/etc/ssh/authorized_keys/$CLIENT"
+
+# Clean up VPN config
+rm -f "/etc/wireguard/$CLIENT.conf"
+
+# Clean up any leftover home directory
+rm -rf "/home/$CLIENT"
+REMOTE
+
+    echo "Client '$client' destroyed."
 }
 
+# --- browse ---
 cmd_browse() {
     local client="$1"
     if [ -z "$client" ]; then
-        echo "Usage: work browse <client-name>"
+        echo "Usage: work browse <client>"
         echo "Opens isolated Chrome routed through Pi's network/VPN"
         exit 1
     fi
-
     _validate_client_name "$client"
-    # Deterministic per-client port: hash client name to 1080-2079 range
+
     local proxy_port=$(( 1080 + $(printf '%s' "$client" | cksum | cut -d' ' -f1) % 1000 ))
     local chrome_dir="$HOME/.chrome-clients/$client"
 
-    # Check if proxy is already running for this client
     if ! lsof -i ":$proxy_port" &>/dev/null; then
         echo "Starting SOCKS proxy for $client on port $proxy_port..."
         ssh -D "127.0.0.1:$proxy_port" -N -f "$PI_USER@$PI_HOST"
@@ -279,7 +344,6 @@ cmd_browse_stop() {
             echo "No proxy running for $client on port $proxy_port."
         fi
     else
-        # Stop all SOCKS proxies (ssh -D)
         local pids=$(ps aux | grep 'ssh -D 127.0.0.1' | grep -v grep | awk '{print $2}')
         if [ -n "$pids" ]; then
             echo "$pids" | xargs kill
@@ -290,49 +354,33 @@ cmd_browse_stop() {
     fi
 }
 
+# --- health ---
 cmd_health() {
     local warn=""
 
-    # Connectivity
     if ! _ssh_quiet "echo ok" >/dev/null; then
         osascript -e 'display notification "Pi is OFFLINE" with title "work health" sound name "Basso"' 2>/dev/null
         echo "OFFLINE - Pi unreachable at $PI_HOST"
         exit 1
     fi
 
-    # Gather metrics
     local metrics
     metrics=$(_ssh_quiet "
-        # RAM usage percentage
         ram_pct=\$(free | awk '/Mem/{printf \"%.0f\", \$3/\$2*100}')
         ram_used=\$(free -h | awk '/Mem/{print \$3}')
         ram_total=\$(free -h | awk '/Mem/{print \$2}')
-
-        # Disk usage percentage
         disk_pct=\$(df / | awk 'NR==2{gsub(/%/,\"\"); print \$5}')
         disk_used=\$(df -h / | awk 'NR==2{print \$3}')
         disk_total=\$(df -h / | awk 'NR==2{print \$2}')
-
-        # CPU temp
         temp=\$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
         temp_c=\$((temp / 1000))
-
-        # Load
         load=\$(awk '{print \$1}' /proc/loadavg)
-
-        # Docker containers
         docker_count=\$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')
-
-        # WireGuard
-        wg_count=\$(sudo wg show 2>/dev/null | grep -c 'interface' || echo 0)
-
-        # Uptime
+        wg_count=\$(sudo -n wg show 2>/dev/null | grep -c 'interface' || echo 0)
         up=\$(uptime -p 2>/dev/null | sed 's/up //')
-
         echo \"ram_pct=\$ram_pct|ram=\${ram_used}/\${ram_total}|disk_pct=\$disk_pct|disk=\${disk_used}/\${disk_total}|temp=\${temp_c}|load=\$load|docker=\$docker_count|vpn=\$wg_count|up=\$up\"
     ")
 
-    # Parse
     local ram_pct=$(echo "$metrics" | cut -d'|' -f1 | cut -d'=' -f2)
     local ram=$(echo "$metrics" | cut -d'|' -f2 | cut -d'=' -f2)
     local disk_pct=$(echo "$metrics" | cut -d'|' -f3 | cut -d'=' -f2)
@@ -343,12 +391,10 @@ cmd_health() {
     local vpn=$(echo "$metrics" | cut -d'|' -f8 | cut -d'=' -f2)
     local up=$(echo "$metrics" | cut -d'|' -f9 | cut -d'=' -f2)
 
-    # Alerts
     [ "$ram_pct" -gt 85 ] 2>/dev/null && warn="${warn}RAM critical (${ram_pct}%) "
     [ "$disk_pct" -gt 85 ] 2>/dev/null && warn="${warn}Disk critical (${disk_pct}%) "
     [ "$temp" -gt 75 ] 2>/dev/null && warn="${warn}Temp high (${temp}C) "
 
-    # Output
     echo "pi-workstation  up $up"
     echo ""
     echo "  RAM    ${ram} (${ram_pct}%)"
@@ -375,26 +421,32 @@ cmd_watch() {
     done
 }
 
+# --- report ---
+# Merges Mac local log + each Pi client's log (iterates client users)
 cmd_report() {
     local period="${1:---week}"
     local local_log="${XDG_DATA_HOME:-$HOME/.local/share}/work-tracker/log.tsv"
     local tmp="/tmp/work-tracker-merged-$$.tsv"
+    local sorted="/tmp/work-tracker-sorted-$$.tsv"
 
-    # Header
     printf 'timestamp\tevent\tclient\tproject\tsource\n' > "$tmp"
 
-    # Local log
+    # Mac local log
     [ -f "$local_log" ] && tail -n +2 "$local_log" >> "$tmp"
 
-    # Pi log (merge if reachable)
-    local pi_log
-    pi_log=$(_ssh_quiet "cat ~/.local/share/work-tracker/log.tsv 2>/dev/null") || true
-    if [ -n "$pi_log" ]; then
-        echo "$pi_log" | tail -n +2 >> "$tmp"
+    # Iterate client users on Pi and pull each log
+    local clients
+    clients=$(_list_clients)
+    if [ -n "$clients" ]; then
+        while IFS= read -r client; do
+            [ -z "$client" ] && continue
+            local client_log
+            client_log=$(_ssh_as_quiet "$client" "cat ~/.local/share/work-tracker/log.tsv 2>/dev/null") || true
+            [ -n "$client_log" ] && echo "$client_log" | tail -n +2 >> "$tmp"
+        done <<< "$clients"
     fi
 
-    # Sort and deduplicate
-    local sorted="/tmp/work-tracker-sorted-$$.tsv"
+    # Sort and dedup
     printf 'timestamp\tevent\tclient\tproject\tsource\n' > "$sorted"
     tail -n +2 "$tmp" | sort -t"$(printf '\t')" -k1,1n | uniq >> "$sorted"
 
@@ -402,6 +454,8 @@ cmd_report() {
     rm -f "$tmp" "$sorted"
 }
 
+# --- ssh-keygen ---
+# Generates an SSH key on the Pi inside the CLIENT user's home (not admin's)
 cmd_ssh_keygen() {
     local client="$1"
     local host="${2:-github.com}"
@@ -409,7 +463,7 @@ cmd_ssh_keygen() {
     if [ -z "$client" ]; then
         echo "Usage: work ssh-keygen <client> [host]"
         echo ""
-        echo "Generates an SSH key for a client on the Pi and configures ~/.ssh/config"
+        echo "Generates an SSH key in the client's home on the Pi"
         echo ""
         echo "Examples:"
         echo "  work ssh-keygen acme                 # github.com (default)"
@@ -423,11 +477,10 @@ cmd_ssh_keygen() {
     local key_name="${client}_ed25519"
     local ssh_alias="${host}-${client}"
 
-    _ssh "
+    _ssh_as "$client" "
         set -e
         mkdir -p ~/.ssh/config.d && chmod 700 ~/.ssh ~/.ssh/config.d
 
-        # Generate key if it doesn't exist
         if [ -f ~/.ssh/$key_name ]; then
             echo 'Key already exists: ~/.ssh/$key_name'
         else
@@ -435,19 +488,17 @@ cmd_ssh_keygen() {
             echo 'Key generated: ~/.ssh/$key_name'
         fi
 
-        # Write client SSH config fragment (idempotent)
-        cat > ~/.ssh/config.d/$client << SSHCONF
-# $client ($host)
+        cat > ~/.ssh/config.d/$host << SSHCONF
+# $host
 Host $ssh_alias
     HostName $host
     User git
     IdentityFile ~/.ssh/$key_name
     IdentitiesOnly yes
 SSHCONF
-        chmod 600 ~/.ssh/config.d/$client
-        echo 'SSH config: ~/.ssh/config.d/$client'
+        chmod 600 ~/.ssh/config.d/$host
+        echo 'SSH config: ~/.ssh/config.d/$host'
 
-        # Ensure Include line in ~/.ssh/config
         if ! grep -q 'Include config.d/\\*' ~/.ssh/config 2>/dev/null; then
             { echo 'Include config.d/*'; cat ~/.ssh/config 2>/dev/null; } > ~/.ssh/config.tmp
             mv ~/.ssh/config.tmp ~/.ssh/config
@@ -465,54 +516,69 @@ SSHCONF
     "
 }
 
+# --- tracker-status ---
 cmd_tracker_status() {
-    echo "=== Local ==="
+    echo "=== Local (Mac) ==="
     work-tracker status
     echo ""
-    echo "=== Pi ==="
-    _ssh_quiet "~/.local/bin/work-tracker status 2>/dev/null" || echo "  (unreachable)"
+
+    local clients
+    clients=$(_list_clients)
+    if [ -z "$clients" ]; then
+        echo "(no client users on Pi)"
+        return
+    fi
+
+    while IFS= read -r client; do
+        [ -z "$client" ] && continue
+        echo "=== Pi: $client ==="
+        _ssh_as_quiet "$client" "~/.local/bin/work-tracker status 2>/dev/null" || echo "  (unreachable)"
+        echo ""
+    done <<< "$clients"
 }
 
+# --- help ---
 cmd_help() {
-    echo "work - Manage freelance workspaces on Pi"
+    echo "work - Manage freelance workspaces on Pi (multi-user)"
     echo ""
     echo "Commands:"
-    echo "  work connect [client] [project]  SSH + tmux (fuzzy project match)"
-    echo "  work setup <client>       Create client workspace + SSH key"
-    echo "  work status               Show Pi status, VPNs, sessions"
-    echo "  work health               Quick health check with alerts"
-    echo "  work watch [seconds]      Live monitor (default: 30s)"
-    echo "  work sync <client> [dir]  Rsync local dir to Pi"
-    echo "  work browse <client>      Chrome isolated via Pi network"
-    echo "  work browse-stop          Stop the SOCKS proxy"
-    echo "  work vpn-up <client>      Start client VPN"
-    echo "  work vpn-down <client>    Stop client VPN"
-    echo "  work ssh-keygen <client> [host]  Generate SSH key for client"
-    echo "  work destroy <client>     Delete all client data"
+    echo "  work connect [client] [project]   SSH as client + tmux (fuzzy project match)"
+    echo "  work user-create <client>         Create a dedicated Linux user for a client"
+    echo "  work status                       fastfetch-style Pi status"
+    echo "  work health                       Quick health check with alerts"
+    echo "  work watch [seconds]              Live monitor (default: 30s)"
+    echo "  work sync <client> [dir] [sub]    Rsync local dir to client's home"
+    echo "  work browse <client>              Chrome isolated via Pi network"
+    echo "  work browse-stop [client]         Stop SOCKS proxy"
+    echo "  work vpn-up <client>              Start client VPN"
+    echo "  work vpn-down <client>            Stop client VPN"
+    echo "  work ssh-keygen <client> [host]   Generate SSH key in client's home"
+    echo "  work destroy <client>             Remove user + home + VPN + keys"
     echo ""
     echo "Time tracking:"
-    echo "  work report [--day|--week|--month]  Hours per client"
-    echo "  work tracker-status                 Active tracking sessions"
+    echo "  work report [--day|--week|--month|--cal|--prev|--all]"
+    echo "  work tracker-status               Active sessions (Mac + each client)"
     echo ""
     echo "Config (env vars):"
-    echo "  WORK_PI_HOST      Pi hostname (default: pi-workstation)"
-    echo "  WORK_PI_USER      Pi username (default: max)"
+    echo "  WORK_PI_HOST         Pi hostname (default: pi-workstation)"
+    echo "  WORK_PI_USER         Admin user on Pi (default: max)"
+    echo "  WORK_DOTFILES_REPO   Dotfiles repo URL for new users"
 }
 
 case "${1:-}" in
-    connect)      shift; cmd_connect "$@" ;;
-    setup)        shift; cmd_setup "$@" ;;
-    status)       cmd_status ;;
-    health)       cmd_health ;;
-    watch)        shift; cmd_watch "$@" ;;
-    sync)         shift; cmd_sync "$@" ;;
-    browse)       shift; cmd_browse "$@" ;;
-    browse-stop)  cmd_browse_stop ;;
-    vpn-up)       shift; cmd_vpn_up "$@" ;;
-    vpn-down)     shift; cmd_vpn_down "$@" ;;
-    destroy)      shift; cmd_destroy "$@" ;;
-    ssh-keygen)   shift; cmd_ssh_keygen "$@" ;;
-    report)       shift; cmd_report "$@" ;;
+    connect)        shift; cmd_connect "$@" ;;
+    user-create)    shift; cmd_user_create "$@" ;;
+    status)         cmd_status ;;
+    health)         cmd_health ;;
+    watch)          shift; cmd_watch "$@" ;;
+    sync)           shift; cmd_sync "$@" ;;
+    browse)         shift; cmd_browse "$@" ;;
+    browse-stop)    shift; cmd_browse_stop "$@" ;;
+    vpn-up)         shift; cmd_vpn_up "$@" ;;
+    vpn-down)       shift; cmd_vpn_down "$@" ;;
+    destroy)        shift; cmd_destroy "$@" ;;
+    ssh-keygen)     shift; cmd_ssh_keygen "$@" ;;
+    report)         shift; cmd_report "$@" ;;
     tracker-status) cmd_tracker_status ;;
-    *)            cmd_help ;;
+    *)              cmd_help ;;
 esac

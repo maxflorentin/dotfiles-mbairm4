@@ -1,33 +1,32 @@
 #!/bin/bash
 
-# tmux-layout: Create a workspace layout for a client session
-# Usage: tmux-layout <client> [project]
-#   client  - client name (e.g. acme)
+# tmux-layout: Create a workspace layout for the current client user
+# Usage: tmux-layout [project]
 #   project - fuzzy project name (e.g. "cdc" matches "spark-cdc")
+#
+# The client is derived from $USER (one Linux user per client).
+# Projects live under $HOME/ directly. The client profile is at ~/.clientrc.
 
 set -e
 
-CLIENT="$1"
-PROJECT="${2:-}"
-CLIENT_DIR="$HOME/clients/$CLIENT"
-CLIENTRC="$CLIENT_DIR/.clientrc"
+CLIENT="$USER"
+PROJECT="${1:-}"
+CLIENTRC="$HOME/.clientrc"
 
-# Resolve project directory (fuzzy match)
+# Resolve project directory (fuzzy match against top-level dirs in $HOME)
 resolve_project_dir() {
-    local base="$1"
-    local query="$2"
+    local query="$1"
 
-    # Exact match first
-    [ -d "$base/$query" ] && echo "$base/$query" && return
+    [ -d "$HOME/$query" ] && echo "$HOME/$query" && return
 
-    # Fuzzy: find dirs containing the query
     local match
-    match=$(find "$base" -maxdepth 1 -type d -iname "*${query}*" 2>/dev/null | head -1)
+    match=$(find "$HOME" -maxdepth 1 -type d -iname "*${query}*" \
+        ! -name '.*' ! -path "$HOME" 2>/dev/null | head -1)
 
     if [ -n "$match" ]; then
         echo "$match"
     else
-        echo "$base"
+        echo "$HOME"
     fi
 }
 
@@ -44,11 +43,11 @@ _pane_init() {
 
 # Determine working directory and session name
 if [ -n "$PROJECT" ]; then
-    WORK_DIR=$(resolve_project_dir "$CLIENT_DIR" "$PROJECT")
-    SESSION="${CLIENT}-${PROJECT}"
+    WORK_DIR=$(resolve_project_dir "$PROJECT")
+    SESSION="$PROJECT"
 else
-    WORK_DIR="$CLIENT_DIR"
-    SESSION="$CLIENT"
+    WORK_DIR="$HOME"
+    SESSION="workspace"
 fi
 
 [ ! -d "$WORK_DIR" ] && WORK_DIR="$HOME"
@@ -67,11 +66,8 @@ tmux split-window -h -t "$SESSION:workspace" -c "$WORK_DIR" -l 35%
 tmux split-window -v -t "$SESSION:workspace.1" -c "$WORK_DIR" -l 40%
 
 # Init all panes
-# Pane 0 (main): tree overview of workspace
 _pane_init "$SESSION:workspace.0" "ls -la"
-# Pane 1 (top-right): recent git log
 _pane_init "$SESSION:workspace.1" "git log --oneline --graph -15 2>/dev/null || ls"
-# Pane 2 (bottom-right): git status
 _pane_init "$SESSION:workspace.2" "git status 2>/dev/null || echo 'No git repo'"
 
 tmux select-pane -t "$SESSION:workspace.0"

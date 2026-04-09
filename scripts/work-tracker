@@ -40,20 +40,25 @@ cmd_stop() {
     _log_event "stop" "$client" "$project" "$source"
 }
 
-# pulse: called by cron every 5 min on Pi
-# Checks each tmux session's last activity and logs a "tick" if active
+# pulse: called by cron every 5 min on Pi (per client user)
+# Client is derived from $USER. Session name becomes the project.
 cmd_pulse() {
     command -v tmux >/dev/null 2>&1 || return 0
     local now
     now=$(date +%s)
+    local client="${USER:-$(whoami)}"
 
     tmux list-sessions -F '#{session_name} #{session_activity}' 2>/dev/null | while read -r session last_activity; do
         # Skip generic sessions
         [ "$session" = "main" ] && continue
 
+        # In per-user mode, the "workspace" session is project-less
+        local project="$session"
+        [ "$session" = "workspace" ] && project=""
+
         local idle=$((now - last_activity))
         if [ "$idle" -lt "$IDLE_THRESHOLD" ]; then
-            _log_event "tick" "$session" "" "pi"
+            _log_event "tick" "$client" "$project" "pi"
         fi
     done
 }
