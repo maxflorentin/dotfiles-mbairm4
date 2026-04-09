@@ -149,6 +149,9 @@ if [ ! -f ~/.clientrc ]; then
 # $USER client environment
 # Sourced automatically by tmux-layout on connect
 
+# --- Identity ---
+export CLIENT="$USER"
+
 # --- Secrets (via envy) ---
 # eval \$(envy-load $USER 2>/dev/null)
 
