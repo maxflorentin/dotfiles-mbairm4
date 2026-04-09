@@ -1,78 +1,169 @@
 // fastfetch config for Pi workstation
-// Used by `work status` — includes work-specific modules (tmux, clients, VPN)
+// Used by `work status` — grouped sections with work-specific modules
+// Style inspired by https://github.com/KaykCaputo/aliencat-fastfetch
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+
   "logo": {
     "source": "raspbian",
-    "padding": {
-      "top": 1,
-      "right": 3
+    "padding": { "top": 1, "left": 1, "right": 3 }
+  },
+
+  "display": {
+    "separator": " ",
+    "color": {
+      "title": "38;2;80;200;255"
     }
   },
-  "display": {
-    "separator": "  "
-  },
+
   "modules": [
-    "title",
-    "separator",
-    "os",
-    "host",
-    "kernel",
-    "uptime",
-    "packages",
-    "shell",
+    "break",
+    {
+      "type": "title",
+      "format": "   \u001b[38;2;80;200;255m{user} \u001b[38;2;100;100;100m@ \u001b[38;2;120;255;180m{host-name}"
+    },
+    "break",
+
+    {
+      "type": "custom",
+      "format": "\u001b[38;2;80;200;255m╭─  Hardware"
+    },
+    {
+      "type": "host",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m Host",
+      "keyColor": "default"
+    },
     {
       "type": "cpu",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m CPU ",
+      "keyColor": "default",
       "showPeCoreCount": false
     },
     {
       "type": "memory",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m Mem ",
+      "keyColor": "default",
       "format": "{used} / {total} ({percentage})"
     },
     {
-      "type": "swap"
+      "type": "swap",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m Swap",
+      "keyColor": "default"
     },
     {
       "type": "disk",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m Disk",
+      "keyColor": "default",
       "folders": "/:/home"
     },
     {
+      "type": "command",
+      "key": "\u001b[38;2;80;200;255m╰─ \u001b[38;2;120;255;180m Temp",
+      "keyColor": "default",
+      "text": "awk '{printf \"%d°C\", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo n/a"
+    },
+
+    "break",
+
+    {
+      "type": "custom",
+      "format": "\u001b[38;2;80;200;255m╭─  Software"
+    },
+    {
+      "type": "os",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m OS  ",
+      "keyColor": "default"
+    },
+    {
+      "type": "kernel",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m Kern",
+      "keyColor": "default"
+    },
+    {
+      "type": "packages",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m󰏖 Pkgs",
+      "format": "{all}",
+      "keyColor": "default"
+    },
+    {
+      "type": "shell",
+      "key": "\u001b[38;2;80;200;255m╰─ \u001b[38;2;120;255;180m Shell",
+      "keyColor": "default"
+    },
+
+    "break",
+
+    {
+      "type": "custom",
+      "format": "\u001b[38;2;80;200;255m╭─  Network"
+    },
+    {
       "type": "localip",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m󰩟 IP  ",
+      "keyColor": "default",
       "showIpv4": true,
       "showIpv6": false
     },
     {
       "type": "command",
-      "key": "Temp",
-      "text": "awk '{printf \"%d°C\", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 'n/a'"
+      "key": "\u001b[38;2;80;200;255m╰─ \u001b[38;2;120;255;180m VPN ",
+      "keyColor": "default",
+      "text": "v=$(sudo -n wg show 2>/dev/null | awk '/^interface:/{printf \"%s \", $2}' | sed 's/ $//'); echo ${v:-none}"
     },
-    {
-      "type": "command",
-      "key": "Load",
-      "text": "awk '{print $1, $2, $3}' /proc/loadavg"
-    },
+
     "break",
+
+    {
+      "type": "custom",
+      "format": "\u001b[38;2;80;200;255m╭─  Work"
+    },
     {
       "type": "command",
-      "key": "Docker",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m Docker ",
+      "keyColor": "default",
       "text": "c=$(docker ps --format '{{.Names}}' 2>/dev/null | paste -sd ', '); echo ${c:-none}"
     },
     {
       "type": "command",
-      "key": "VPN",
-      "text": "v=$(sudo -n wg show 2>/dev/null | awk '/^interface:/{printf \"%s \", $2}' | sed 's/ $//'); echo ${v:-none}"
-    },
-    {
-      "type": "command",
-      "key": "Tmux",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m Tmux   ",
+      "keyColor": "default",
       "text": "t=$(tmux list-sessions 2>/dev/null | awk -F: '{printf \"%s \", $1}' | sed 's/ $//'); echo ${t:-none}"
     },
     {
       "type": "command",
-      "key": "Clients",
+      "key": "\u001b[38;2;80;200;255m╰─ \u001b[38;2;120;255;180m Clients",
+      "keyColor": "default",
       "text": "c=$(ls -1 ~/clients/ 2>/dev/null | paste -sd ', '); echo ${c:-none}"
     },
+
     "break",
-    "colors"
+
+    {
+      "type": "custom",
+      "format": "\u001b[38;2;80;200;255m╭─  Time"
+    },
+    {
+      "type": "command",
+      "key": "\u001b[38;2;80;200;255m├─ \u001b[38;2;120;255;180m Age ",
+      "keyColor": "default",
+      "text": "birth=$(stat -c %W / 2>/dev/null || echo 0); if [ \"$birth\" -eq 0 ]; then echo Unknown; else now=$(date +%s); diff=$((now - birth)); days=$((diff/86400)); echo \"$days days\"; fi"
+    },
+    {
+      "type": "uptime",
+      "key": "\u001b[38;2;80;200;255m╰─ \u001b[38;2;120;255;180m󰅐 Up  ",
+      "keyColor": "default"
+    },
+
+    "break",
+
+    {
+      "type": "colors",
+      "symbol": "star",
+      "paddingLeft": 0,
+      "block": {
+        "range": [2, 6]
+      }
+    },
+    "break"
   ]
 }

@@ -84,7 +84,9 @@
       "Bash(ssh encryption_user@pi-workstation 'echo test' 2>&1; ssh max@pi-workstation 'sudo rm -rf /home.old 2>&1; ls /home.old 2>&1 || echo \"cleaned\"')",
       "Bash(ssh max@pi-workstation 'sudo reboot' 2>&1; echo \"reboot sent\")",
       "Bash(ssh max@pi-workstation 'sudo rm -rf /home.old && echo \"cleaned\" || echo \"still busy\"')",
-      "Bash(ssh max@pi-workstation 'sudo systemctl enable wazuh-agent && sudo systemctl start wazuh-agent && sudo systemctl is-active wazuh-agent')"
+      "Bash(ssh max@pi-workstation 'sudo systemctl enable wazuh-agent && sudo systemctl start wazuh-agent && sudo systemctl is-active wazuh-agent')",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
