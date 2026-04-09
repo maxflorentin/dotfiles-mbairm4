@@ -18,6 +18,12 @@ alias c="clear"
 alias vim=nvim
 alias k=kubectl
 
+# Debian/Raspbian ships bat as batcat and fd as fdfind
+if [[ "$(uname)" == "Linux" ]]; then
+    command -v batcat &>/dev/null && alias bat='batcat'
+    command -v fdfind &>/dev/null && alias fd='fdfind'
+fi
+
 # Docker/Podman (only alias if podman exists)
 if command -v podman &>/dev/null; then
     alias docker=podman

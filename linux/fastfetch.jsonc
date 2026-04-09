@@ -133,7 +133,7 @@
       "type": "command",
       "key": "\u001b[38;2;80;200;255m╰─ \u001b[38;2;120;255;180m Clients",
       "keyColor": "default",
-      "text": "c=$(getent passwd | awk -F: '$3>=1000 && $1!=\"nobody\" && $1!=\"'$USER'\" {print $1}' | paste -sd ', '); echo ${c:-none}"
+      "text": "c=$(getent passwd | awk -F: -v me=\"$USER\" '$3>=1000 && $1!=\"nobody\" && $1!=me && $1!=\"encryption_user\" && $7 !~ /(nologin|false)$/ && $6 ~ /^\\/home\\// {print $1}' | paste -sd ', '); echo ${c:-none}"
     },
 
     "break",

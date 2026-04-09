@@ -13,20 +13,25 @@ CLIENT="$USER"
 PROJECT="${1:-}"
 CLIENTRC="$HOME/.clientrc"
 
-# Resolve project directory (fuzzy match against top-level dirs in $HOME)
+# Resolve project directory.
+# Searches (in order): exact path in $HOME, exact path in $HOME/repos,
+# then fuzzy match up to 2 levels deep (covers $HOME/repos/<name>),
+# excluding any hidden directory.
 resolve_project_dir() {
     local query="$1"
 
     [ -d "$HOME/$query" ] && echo "$HOME/$query" && return
+    [ -d "$HOME/repos/$query" ] && echo "$HOME/repos/$query" && return
 
     local match
-    match=$(find "$HOME" -maxdepth 1 -type d -iname "*${query}*" \
-        ! -name '.*' ! -path "$HOME" 2>/dev/null | head -1)
+    match=$(find "$HOME" -maxdepth 2 -type d -iname "*${query}*" \
+        ! -path '*/.*' ! -path "$HOME" 2>/dev/null | head -1)
 
     if [ -n "$match" ]; then
         echo "$match"
     else
-        echo "$HOME"
+        # Default landing dir: $HOME/repos if it exists, else $HOME
+        [ -d "$HOME/repos" ] && echo "$HOME/repos" || echo "$HOME"
     fi
 }
 
@@ -46,7 +51,8 @@ if [ -n "$PROJECT" ]; then
     WORK_DIR=$(resolve_project_dir "$PROJECT")
     SESSION="$PROJECT"
 else
-    WORK_DIR="$HOME"
+    # Default landing: $HOME/repos if it exists, else $HOME
+    [ -d "$HOME/repos" ] && WORK_DIR="$HOME/repos" || WORK_DIR="$HOME"
     SESSION="workspace"
 fi
 

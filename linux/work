@@ -35,9 +35,10 @@ _ssh_as_tty()   { local u="$1"; shift; ssh -tt "$u@$PI_HOST" "$@"; }
 _ssh_as_quiet() { local u="$1"; shift; ssh -o ConnectTimeout=3 "$u@$PI_HOST" "$@" 2>/dev/null; }
 _ssh_as_data()  { local u="$1"; shift; ssh -T  -o ClearAllForwardings=yes "$u@$PI_HOST" "$@"; }
 
-# List client users on the Pi (all human users except $PI_USER)
+# List client users on the Pi (real humans with /home and a login shell,
+# excluding the admin user and known system helpers like ecryptfs's encryption_user).
 _list_clients() {
-    _ssh_quiet "getent passwd | awk -F: '\$3>=1000 && \$1!=\"$PI_USER\" && \$1!=\"nobody\" {print \$1}'"
+    _ssh_quiet "getent passwd | awk -F: '\$3>=1000 && \$1!=\"$PI_USER\" && \$1!=\"nobody\" && \$1!=\"encryption_user\" && \$7 !~ /(nologin|false)\$/ && \$6 ~ /^\\/home\\// {print \$1}'"
 }
 
 # --- connect ---
