@@ -93,6 +93,14 @@ else
     echo "  user $CLIENT created (home: /home/$CLIENT)"
 fi
 
+# Share the Docker daemon with the client (images/volumes are rootful, in
+# /var/lib/docker — cero duplicación). Group 'docker' grants socket access.
+# Idempotent: usermod -aG on an already-member user is a no-op.
+if getent group docker >/dev/null 2>&1; then
+    usermod -aG docker "$CLIENT"
+    echo "  user $CLIENT added to docker group"
+fi
+
 # Seed SSH authorized_keys (ecryptfs-compatible path used by sshd_config)
 mkdir -p /etc/ssh/authorized_keys
 if [ ! -f "/etc/ssh/authorized_keys/$CLIENT" ]; then
