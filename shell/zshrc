@@ -130,4 +130,4 @@ if [ -f "$HOME/Projects/gcp/google-cloud-sdk/completion.zsh.inc" ]; then . "$HOM
 # Client profile (per-user on the Pi; no-op on the Mac / admin users)
 [ -f "$HOME/.clientrc" ] && source "$HOME/.clientrc"
 
-. "$HOME/.local/bin/env"
+[ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"

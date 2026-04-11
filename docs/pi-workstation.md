@@ -160,6 +160,10 @@ Each client user runs its own `work-tracker pulse` cron every 5 min. `work repor
 | `WORK_PI_USER` | `max` | Admin user on Pi |
 | `WORK_DOTFILES_REPO` | `https://github.com/maxflorentin/dotfiles-mbairm4.git` | Repo cloned into new client homes |
 
+## Remote Access
+
+See [remote-access.md](remote-access.md) for the complete setup guide (Tailscale, WireGuard, SSH profiles, iPhone config).
+
 ## Migration
 
 The setup is portable. To move to a new machine:
