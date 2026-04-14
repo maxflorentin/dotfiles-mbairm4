@@ -453,14 +453,14 @@ cmd_report() {
     # Mac local log
     [ -f "$local_log" ] && tail -n +2 "$local_log" >> "$tmp"
 
-    # Iterate client users on Pi and pull each log
+    # Iterate client users on Pi and pull each log (via admin sudo)
     local clients
     clients=$(_list_clients)
     if [ -n "$clients" ]; then
         while IFS= read -r client; do
             [ -z "$client" ] && continue
             local client_log
-            client_log=$(_ssh_as_quiet "$client" "cat ~/.local/share/work-tracker/log.tsv 2>/dev/null") || true
+            client_log=$(_ssh_quiet "sudo cat /home/$client/.local/share/work-tracker/log.tsv 2>/dev/null") || true
             [ -n "$client_log" ] && echo "$client_log" | tail -n +2 >> "$tmp"
         done <<< "$clients"
     fi
@@ -551,7 +551,7 @@ cmd_tracker_status() {
     while IFS= read -r client; do
         [ -z "$client" ] && continue
         echo "=== Pi: $client ==="
-        _ssh_as_quiet "$client" "~/.local/bin/work-tracker status 2>/dev/null" || echo "  (unreachable)"
+        _ssh_quiet "sudo -u $client /home/$client/.local/bin/work-tracker status 2>/dev/null" || echo "  (unreachable)"
         echo ""
     done <<< "$clients"
 }

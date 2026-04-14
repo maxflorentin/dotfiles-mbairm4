@@ -164,6 +164,10 @@ Each client user runs its own `work-tracker pulse` cron every 5 min. `work repor
 
 See [remote-access.md](remote-access.md) for the complete setup guide (Tailscale, WireGuard, SSH profiles, iPhone config).
 
+## Development Workflow
+
+See [dev-workflow.md](dev-workflow.md) for how to split work between Mac and Pi (VSCode Remote, Claude Code, Docker, iPhone access).
+
 ## Migration
 
 The setup is portable. To move to a new machine:
