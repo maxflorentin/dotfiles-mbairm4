@@ -24,7 +24,7 @@ Internet
            ▼
 ┌─────────────────────────────┐
 │ Pi / Server                 │
-│ Tailscale: 100.88.210.35   │
+│ Tailscale: 100.102.172.111   │
 └─────────────────────────────┘
 ```
 
@@ -197,17 +197,17 @@ If your ISP changes your public IP, WireGuard clients can't find the server. Opt
 
 ## SSH Profiles
 
-### Mac (`~/.ssh/config.d/pi-workstation`)
+### Mac (`~/.ssh/config.d/workstation`)
 
 All hosts use the Tailscale IP so they work both on LAN and remotely:
 
 ```
-Host pi-workstation
-    HostName 100.88.210.35
+Host workstation
+    HostName 100.102.172.111
     User max
 
-Host pi-mutt
-    HostName 100.88.210.35
+Host ws-mutt
+    HostName 100.102.172.111
     User mutt
     PreferredAuthentications password
     PubkeyAuthentication no
@@ -216,12 +216,12 @@ Host pi-mutt
     LocalForward 5000 localhost:5000
     LocalForward 3000 localhost:3000
 
-Host pi-lahuen
-    HostName 100.88.210.35
+Host ws-lahuen
+    HostName 100.102.172.111
     User lahuen
 
 # Emergency LAN fallback
-Host pi-lan
+Host ws-lan
     HostName 192.168.68.55
     User max
 ```
@@ -232,9 +232,9 @@ Create one profile per client user:
 
 | Profile | Host | User | Auth |
 |---------|------|------|------|
-| pi-workstation | 100.88.210.35 | max | SSH key |
-| pi-mutt | 100.88.210.35 | mutt | Password (ecryptfs auto-mount) |
-| pi-lahuen | 100.88.210.35 | lahuen | SSH key |
+| workstation | 100.102.172.111 | max | SSH key |
+| ws-mutt | 100.102.172.111 | mutt | Password (ecryptfs auto-mount) |
+| ws-lahuen | 100.102.172.111 | lahuen | SSH key |
 
 Tailscale must be active (VPN toggle on) before connecting.
 
@@ -258,18 +258,18 @@ Run these after setup or when troubleshooting:
 
 ```bash
 # 1. Tailscale mesh is connected
-tailscale ping pi-workstation        # from Mac
+tailscale ping workstation        # from Mac
 tailscale status                     # from any node
 
 # 2. SSH works via Tailscale IP
-ssh pi-workstation                   # key auth, admin user
-ssh pi-mutt                          # password auth → ecryptfs mounts
+ssh workstation                   # key auth, admin user
+ssh ws-mutt                          # password auth → ecryptfs mounts
 
 # 3. From iPhone
-# Tailscale VPN on → open terminal app → ssh max@100.88.210.35
+# Tailscale VPN on → open terminal app → ssh max@100.102.172.111
 
 # 4. LAN fallback (only if on same network)
-ssh pi-lan
+ssh ws-lan
 ```
 
 ---

@@ -140,7 +140,7 @@ Each client gets:
 
 ## VS Code Remote
 
-Install the "Remote - SSH" extension. Connect via `Cmd+Shift+P` > "Remote-SSH: Connect to Host" > `<client>@pi-workstation`. The `<client>` prefix picks the right Linux user.
+Install the "Remote - SSH" extension. Connect via `Cmd+Shift+P` > "Remote-SSH: Connect to Host" > `<client>@workstation`. The `<client>` prefix picks the right Linux user.
 
 ## Client VPNs
 
@@ -156,7 +156,7 @@ Each client user runs its own `work-tracker pulse` cron every 5 min. `work repor
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WORK_PI_HOST` | `pi-workstation` | Server hostname or IP |
+| `WORK_PI_HOST` | `workstation` | Server hostname or IP |
 | `WORK_PI_USER` | `max` | Admin user on Pi |
 | `WORK_DOTFILES_REPO` | `https://github.com/maxflorentin/dotfiles-mbairm4.git` | Repo cloned into new client homes |
 
@@ -172,6 +172,17 @@ See [dev-workflow.md](dev-workflow.md) for how to split work between Mac and Pi 
 
 The setup is portable. To move to a new machine:
 
+**Automated (recommended):**
+
+```bash
+# On the new machine after Debian 12 minimal install:
+bash migrate.sh --from workstation
+```
+
+See `linux/migrate.sh` — handles bootstrap, user creation with matching UIDs, rsync of homes/secrets/VPN configs, ecryptfs, Tailscale, and laptop server config (lid switch, console blanking).
+
+**Manual:**
+
 1. Run `linux/bootstrap.sh` on the new host
 2. Recreate each client: `work user-create <client>`
 3. Restore data: rsync each `/home/<client>/` from old host
@@ -180,3 +191,29 @@ The setup is portable. To move to a new machine:
 6. Update `WORK_PI_HOST` (env var or `~/.ssh/config`)
 
 Everything else (`work` CLI, tmux layouts, aliases) works unchanged.
+
+### Dell Latitude setup notes
+
+If migrating to a laptop (Dell Latitude or similar) for use as a headless server:
+
+- **BIOS (F2):** Power Management → AC Recovery → Last State (auto power-on after outage)
+- **Wake on LAN:** Enable in BIOS (remote wake via Ethernet)
+- **Lid switch:** `migrate.sh` configures systemd to ignore lid close
+- **Battery:** acts as a built-in mini UPS for short power cuts
+- **Ethernet:** prefer wired connection for server reliability
+
+### USB pendrive prep (from Mac)
+
+```bash
+# Format USB
+diskutil eraseDisk FAT32 MIGRATE /dev/diskN
+
+# Copy migration script
+cp ~/.dotfiles/linux/migrate.sh /Volumes/MIGRATE/
+
+# Optional: offline dotfiles tarball
+tar czf /Volumes/MIGRATE/dotfiles.tar.gz -C ~ .dotfiles/
+
+# Copy Debian 12 ISO (download from debian.org)
+cp ~/Downloads/debian-12-*-netinst.iso /Volumes/MIGRATE/
+```

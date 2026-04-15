@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# bootstrap: Set up Raspberry Pi (or Linux ARM) as dev server
+# bootstrap: Set up Linux dev server (ARM64 or x86_64)
 # Run ON the target machine after fresh OS install
 # Usage: curl -sL <raw-url> | bash  OR  scp + run locally
 
@@ -50,7 +50,14 @@ fi
 echo "[5/10] Installing Node..."
 if ! command -v node &>/dev/null; then
     NODE_VERSION="v22.15.0"
-    curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-arm64.tar.xz" \
+    if [ "$ARCH" = "aarch64" ]; then
+        NODE_ARCH="arm64"
+    elif [ "$ARCH" = "x86_64" ]; then
+        NODE_ARCH="x64"
+    else
+        echo "  unsupported architecture: $ARCH"; exit 1
+    fi
+    curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz" \
         | sudo tar -xJ --strip-components=1 -C /usr/local/
 else
     echo "  already installed ($(node --version))"

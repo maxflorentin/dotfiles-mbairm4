@@ -113,10 +113,8 @@ if [ "$OS" = "Linux" ]; then
         }
     fi
 
-    if [ "$ARCH" = "aarch64" ]; then
-        echo ""
-        echo "Pi detected. Fresh setup? Run: $DOTFILES/linux/bootstrap.sh"
-    fi
+    echo ""
+    echo "Fresh Linux setup? Run: $DOTFILES/linux/bootstrap.sh"
 fi
 
 echo ""

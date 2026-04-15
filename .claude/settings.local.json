@@ -183,7 +183,11 @@
       "Bash(ssh pi-workstation \"echo '\n# ecryptfs auto-mount: allow password auth for encrypted client users\n# PAM needs the login password to unwrap ecryptfs passphrase on SSH login\nMatch User mutt\n    PasswordAuthentication yes' | sudo tee -a /etc/ssh/sshd_config > /dev/null && echo 'ADDED' && sudo sshd -t && echo 'CONFIG OK'\")",
       "Bash(ssh pi-workstation \"sudo systemctl restart sshd && echo 'sshd restarted'\")",
       "Bash(ssh pi-mutt \"echo 'LOGIN OK' && mount | grep ecryptfs | grep mutt && echo 'ECRYPTFS MOUNTED'\")",
-      "Bash(grep -r \"socks\\\\|proxy\\\\|port.forward\\\\|ssh.*-D\\\\|tailscale\" /Users/max/.dotfiles --include=\"*.sh\" --include=\"*.md\" 2>/dev/null | head -20)"
+      "Bash(grep -r \"socks\\\\|proxy\\\\|port.forward\\\\|ssh.*-D\\\\|tailscale\" /Users/max/.dotfiles --include=\"*.sh\" --include=\"*.md\" 2>/dev/null | head -20)",
+      "Bash(chmod +x /Users/max/.dotfiles/linux/migrate.sh)",
+      "Bash(bash -n /Users/max/.dotfiles/linux/migrate.sh && echo \"migrate.sh: OK\" || echo \"migrate.sh: FAIL\")",
+      "Bash(bash -n /Users/max/.dotfiles/linux/bootstrap.sh && echo \"bootstrap.sh: OK\" || echo \"bootstrap.sh: FAIL\")",
+      "Bash(bash -n /Users/max/.dotfiles/install && echo \"install: OK\" || echo \"install: FAIL\")"
     ]
   }
 }

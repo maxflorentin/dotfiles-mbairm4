@@ -11,7 +11,7 @@
 
 set -e
 
-PI_HOST="${WORK_PI_HOST:-pi-workstation}"
+PI_HOST="${WORK_PI_HOST:-workstation}"
 PI_USER="${WORK_PI_USER:-max}"
 DOTFILES_REPO="${WORK_DOTFILES_REPO:-https://github.com/maxflorentin/dotfiles-mbairm4.git}"
 
@@ -414,7 +414,7 @@ cmd_health() {
     [ "$disk_pct" -gt 85 ] 2>/dev/null && warn="${warn}Disk critical (${disk_pct}%) "
     [ "$temp" -gt 75 ] 2>/dev/null && warn="${warn}Temp high (${temp}C) "
 
-    echo "pi-workstation  up $up"
+    echo "workstation  up $up"
     echo ""
     echo "  RAM    ${ram} (${ram_pct}%)"
     echo "  Disk   ${disk} (${disk_pct}%)"
@@ -503,7 +503,7 @@ cmd_ssh_keygen() {
         if [ -f ~/.ssh/$key_name ]; then
             echo 'Key already exists: ~/.ssh/$key_name'
         else
-            ssh-keygen -t ed25519 -C '${client}@pi-workstation' -f ~/.ssh/$key_name -N ''
+            ssh-keygen -t ed25519 -C '${client}@workstation' -f ~/.ssh/$key_name -N ''
             echo 'Key generated: ~/.ssh/$key_name'
         fi
 
@@ -558,7 +558,7 @@ cmd_tracker_status() {
 
 # --- help ---
 cmd_help() {
-    echo "work - Manage freelance workspaces on Pi (multi-user)"
+    echo "work - Manage freelance workspaces on Linux server (multi-user)"
     echo ""
     echo "Commands:"
     echo "  work connect [client] [project]   SSH as client + tmux (fuzzy project match)"
@@ -579,8 +579,8 @@ cmd_help() {
     echo "  work tracker-status               Active sessions (Mac + each client)"
     echo ""
     echo "Config (env vars):"
-    echo "  WORK_PI_HOST         Pi hostname (default: pi-workstation)"
-    echo "  WORK_PI_USER         Admin user on Pi (default: max)"
+    echo "  WORK_PI_HOST         Server hostname (default: workstation)"
+    echo "  WORK_PI_USER         Admin user on server (default: max)"
     echo "  WORK_DOTFILES_REPO   Dotfiles repo URL for new users"
 }
 

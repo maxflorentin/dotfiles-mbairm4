@@ -31,11 +31,11 @@ Pi workstation (100.88.210.35)          Mac (Tailscale IP)
 
 ### Option 1: VSCode + Remote SSH (for editing on Pi)
 
-Connect to the Pi via `pi-mutt-vscode` (after mounting ecryptfs).
+Connect to the Pi via `ws-mutt-vscode` (after mounting ecryptfs).
 
 **Workflow:**
-1. Terminal: `ssh pi-mutt` → enter password (mounts ecryptfs home)
-2. VSCode: Remote Explorer → `pi-mutt-vscode` → connects with key auth
+1. Terminal: `ssh ws-mutt` → enter password (mounts ecryptfs home)
+2. VSCode: Remote Explorer → `ws-mutt-vscode` → connects with key auth
 
 **Recommended VSCode settings** (remote, to reduce Pi resource usage):
 
@@ -135,7 +135,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 **Option B: Copy auth from Mac**
 ```bash
 # On Mac:
-scp ~/.config/claude-code/auth.json pi-workstation:~/.config/claude-code/
+scp ~/.config/claude-code/auth.json workstation:~/.config/claude-code/
 ```
 
 ### Usage tips
@@ -209,14 +209,14 @@ Install from Docker Desktop → Extensions → Tailscale. All published containe
 tailscale status
 
 # SSH to Pi works
-ssh pi-workstation
-ssh pi-mutt          # password → ecryptfs
+ssh workstation
+ssh ws-mutt          # password → ecryptfs
 
 # Claude Code on Pi
-ssh pi-workstation
+ssh workstation
 claude --version
 
 # Mac Docker accessible from Pi
-ssh pi-workstation
+ssh workstation
 curl http://<mac-tailscale-ip>:8080
 ```
