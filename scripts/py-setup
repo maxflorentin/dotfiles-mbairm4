@@ -1,0 +1,47 @@
+#!/bin/bash
+# py-setup — agnostic Python project setup (uv / poetry / pip)
+# Usage: source py-setup
+
+# Detect package manager
+if [ -f "poetry.lock" ] && command -v poetry &>/dev/null; then
+    PM="poetry"
+elif command -v uv &>/dev/null; then
+    PM="uv"
+else
+    PM="pip"
+fi
+
+# Setup venv
+if [ ! -d ".venv" ]; then
+    echo "creating venv..."
+    case $PM in
+        poetry) poetry config virtualenvs.in-project true ;;
+        uv)     uv venv .venv ;;
+        pip)    python3 -m venv .venv ;;
+    esac
+fi
+
+# Install deps
+if [ -f "pyproject.toml" ]; then
+    echo "installing with $PM..."
+    case $PM in
+        poetry) poetry install ;;
+        uv)     uv pip install -e ".[dev,dags]" 2>/dev/null \
+                  || uv pip install -e ".[dev]" 2>/dev/null \
+                  || uv pip install -e "." ;;
+        pip)    source .venv/bin/activate && pip install -e ".[dev]" 2>/dev/null \
+                  || pip install -e "." ;;
+    esac
+elif [ -f "requirements.txt" ]; then
+    echo "installing from requirements.txt..."
+    case $PM in
+        uv)  uv pip install -r requirements.txt ;;
+        *)   source .venv/bin/activate && pip install -r requirements.txt ;;
+    esac
+else
+    echo "nothing to install"
+fi
+
+# Activate
+source .venv/bin/activate
+echo "ready ($PM)"

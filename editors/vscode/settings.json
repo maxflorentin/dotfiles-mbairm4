@@ -15,5 +15,6 @@
         "/var/folders/mc/h3_0h98d46qfklpzc_4m55dr0000gn/T/postman-http-request-post-response.instructions.md": true,
         "/var/folders/mc/h3_0h98d46qfklpzc_4m55dr0000gn/T/postman-http-request-pre-request.instructions.md": true
     },
-    "claudeCode.preferredLocation": "panel"
+    "claudeCode.preferredLocation": "panel",
+    "chat.viewSessions.orientation": "stacked"
 }

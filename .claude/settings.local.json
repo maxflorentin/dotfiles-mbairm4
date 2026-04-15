@@ -187,7 +187,15 @@
       "Bash(chmod +x /Users/max/.dotfiles/linux/migrate.sh)",
       "Bash(bash -n /Users/max/.dotfiles/linux/migrate.sh && echo \"migrate.sh: OK\" || echo \"migrate.sh: FAIL\")",
       "Bash(bash -n /Users/max/.dotfiles/linux/bootstrap.sh && echo \"bootstrap.sh: OK\" || echo \"bootstrap.sh: FAIL\")",
-      "Bash(bash -n /Users/max/.dotfiles/install && echo \"install: OK\" || echo \"install: FAIL\")"
+      "Bash(bash -n /Users/max/.dotfiles/install && echo \"install: OK\" || echo \"install: FAIL\")",
+      "Bash(chmod +x /Users/max/.dotfiles/scripts/py-setup)",
+      "Bash(ln -sf /Users/max/.dotfiles/scripts/py-setup \"$HOME/.local/bin/py-setup\" && echo \"linked locally\")",
+      "Bash(ssh workstation \"cd ~/.dotfiles && git pull && ln -sf ~/.dotfiles/scripts/py-setup ~/.local/bin/py-setup && echo 'linked on Dell'\")",
+      "Bash(ssh workstation \"cd ~/.dotfiles && git stash && git pull && git stash pop 2>/dev/null; ln -sf ~/.dotfiles/scripts/py-setup ~/.local/bin/py-setup && echo 'done'\")",
+      "Bash(ssh workstation \"cd ~/.dotfiles && rm docs/remote-access.md linux/fastfetch.jsonc && git pull && git stash pop 2>/dev/null; ln -sf ~/.dotfiles/scripts/py-setup ~/.local/bin/py-setup && py-setup --help 2>/dev/null; echo 'done'\")",
+      "Bash(ssh workstation \"cd ~/.dotfiles && grep -n '<<<<<<<\\\\|=======\\\\|>>>>>>>' shell/zshrc\")",
+      "Bash(ssh workstation \"cd ~/.dotfiles && sed -n '128,140p' shell/zshrc\")",
+      "Bash(ssh workstation 'cd ~/.dotfiles && git checkout --theirs shell/zshrc 2>/dev/null; git checkout shell/zshrc -- 2>/dev/null; git restore --staged shell/zshrc; git checkout HEAD -- shell/zshrc && git stash drop 2>/dev/null; echo \"resolved\"')"
     ]
   }
 }
