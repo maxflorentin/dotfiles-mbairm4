@@ -121,7 +121,7 @@ cmd_report() {
 
     local file="${WORK_TRACKER_LOG:-$LOG_FILE}"
 
-    awk -F'\t' -v cutoff="$cutoff" -v now="$now" -v interval='"$PULSE_INTERVAL"' '
+    awk -F'\t' -v cutoff="$cutoff" -v now="$now" -v interval="$PULSE_INTERVAL" '
     NR==1 { next }
     $1 < cutoff { next }
     {
@@ -146,7 +146,7 @@ cmd_report() {
         grand_conn = 0
         n = 0
         for (k in ticks) {
-            active_h = (ticks[k] * 300) / 3600
+            active_h = (ticks[k] * interval) / 3600
             conn_h = (k in connected) ? connected[k] / 3600 : 0
             grand_active += active_h
             grand_conn += conn_h
