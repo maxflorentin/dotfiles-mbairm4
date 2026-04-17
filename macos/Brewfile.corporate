@@ -20,7 +20,8 @@ brew "starship"              # prompt
 
 # Cloud & IaC
 brew "awscli"
-brew "terraform"
+tap "hashicorp/tap"
+brew "hashicorp/tap/terraform"
 brew "direnv"
 
 # GitHub
