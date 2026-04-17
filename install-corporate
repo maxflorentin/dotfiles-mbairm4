@@ -44,7 +44,7 @@ if ! command -v brew &>/dev/null; then
 fi
 
 echo "  brew: installing packages (Brewfile.corporate)..."
-brew bundle --file="$DOTFILES/macos/Brewfile.corporate" --no-lock
+brew bundle --file="$DOTFILES/macos/Brewfile.corporate"
 echo ""
 
 # --- Shell ---
