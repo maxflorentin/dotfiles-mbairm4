@@ -373,6 +373,52 @@ cmd_browse_stop() {
     fi
 }
 
+# --- agvty (Antigravity via X11 forwarding) ---
+cmd_agvty() {
+    local client="$1"
+    if [ -z "$client" ]; then
+        echo "Usage: work agvty <client>"
+        echo "Opens Antigravity on the server, displayed on Mac via X11 forwarding"
+        echo ""
+        echo "Requires XQuartz on Mac: brew install --cask xquartz"
+        exit 1
+    fi
+    _validate_client_name "$client"
+
+    # Ensure XQuartz is running
+    if ! pgrep -q Xquartz 2>/dev/null; then
+        echo "Starting XQuartz..."
+        open -a XQuartz
+        sleep 2
+    fi
+
+    echo "Launching Antigravity for $client via X11..."
+    ssh -Y "$client@$PI_HOST" "antigravity" &>/dev/null &
+    echo "Antigravity running (X11 → Mac). Close the app window to stop."
+}
+
+cmd_agvty_stop() {
+    local client="${1:-}"
+    if [ -n "$client" ]; then
+        _validate_client_name "$client"
+        local pids=$(ps aux | grep "ssh -Y $client@" | grep antigravity | grep -v grep | awk '{print $2}')
+        if [ -n "$pids" ]; then
+            echo "$pids" | xargs kill
+            echo "Antigravity stopped for $client."
+        else
+            echo "No Antigravity session for $client."
+        fi
+    else
+        local pids=$(ps aux | grep 'ssh -Y.*antigravity' | grep -v grep | awk '{print $2}')
+        if [ -n "$pids" ]; then
+            echo "$pids" | xargs kill
+            echo "All Antigravity sessions stopped."
+        else
+            echo "No Antigravity sessions running."
+        fi
+    fi
+}
+
 # --- health ---
 cmd_health() {
     local warn=""
@@ -569,6 +615,8 @@ cmd_help() {
     echo "  work sync <client> [dir] [sub]    Rsync local dir to client's home"
     echo "  work browse <client>              Chrome isolated via Pi network"
     echo "  work browse-stop [client]         Stop SOCKS proxy"
+    echo "  work agvty <client>               Antigravity via X11 forwarding"
+    echo "  work agvty-stop [client]          Stop Antigravity session"
     echo "  work vpn-up <client>              Start client VPN"
     echo "  work vpn-down <client>            Stop client VPN"
     echo "  work ssh-keygen <client> [host]   Generate SSH key in client's home"
@@ -593,6 +641,8 @@ case "${1:-}" in
     sync)           shift; cmd_sync "$@" ;;
     browse)         shift; cmd_browse "$@" ;;
     browse-stop)    shift; cmd_browse_stop "$@" ;;
+    agvty)          shift; cmd_agvty "$@" ;;
+    agvty-stop)     shift; cmd_agvty_stop "$@" ;;
     vpn-up)         shift; cmd_vpn_up "$@" ;;
     vpn-down)       shift; cmd_vpn_down "$@" ;;
     destroy)        shift; cmd_destroy "$@" ;;
