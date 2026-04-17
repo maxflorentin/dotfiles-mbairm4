@@ -1,0 +1,38 @@
+# Brewfile.corporate: Minimal setup for corporate/managed Macs
+# No design tools, no fullstack langs, no heavy containers
+# Usage: brew bundle --file=macos/Brewfile.corporate
+
+# Core CLI
+brew "git"
+brew "neovim"
+brew "bat"
+brew "fzf"
+brew "ripgrep"
+brew "jq"
+brew "tree"
+brew "coreutils"
+brew "grep"
+
+# Navigation
+brew "autojump"              # j command for fast directory jumping
+brew "zsh-syntax-highlighting"
+brew "starship"              # prompt
+
+# Cloud & IaC
+brew "awscli"
+brew "terraform"
+brew "direnv"
+
+# GitHub
+brew "gh"
+
+# Python
+brew "uv"
+
+# Kubernetes (uncomment if needed)
+# brew "kubernetes-cli"
+# brew "kustomize"
+
+# Terminal & fonts
+cask "iterm2"
+cask "font-fira-code-nerd-font"

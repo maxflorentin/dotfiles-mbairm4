@@ -197,7 +197,8 @@
       "Bash(ssh workstation \"cd ~/.dotfiles && sed -n '128,140p' shell/zshrc\")",
       "Bash(ssh workstation 'cd ~/.dotfiles && git checkout --theirs shell/zshrc 2>/dev/null; git checkout shell/zshrc -- 2>/dev/null; git restore --staged shell/zshrc; git checkout HEAD -- shell/zshrc && git stash drop 2>/dev/null; echo \"resolved\"')",
       "Bash(ssh workstation \"cd ~/.dotfiles && git pull && ln -sf ~/.dotfiles/scripts/py-setup ~/.local/bin/py-setup && which py-setup && echo 'ok'\")",
-      "Bash(ssh workstation \"ls -la ~/.local/bin/py-setup && ~/.local/bin/py-setup 2>&1 | head -1\")"
+      "Bash(ssh workstation \"ls -la ~/.local/bin/py-setup && ~/.local/bin/py-setup 2>&1 | head -1\")",
+      "Bash(chmod +x /Users/max/.dotfiles/install-corporate)"
     ]
   }
 }

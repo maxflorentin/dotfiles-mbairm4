@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# install-corporate: Dotfiles for corporate/managed Macs
+# Minimal, non-invasive — no system defaults, no mackup, no sudo tricks
+#
+# What it does:
+#   - Installs core CLI tools via Homebrew (Brewfile.corporate)
+#   - Links shell config (zshrc, aliases, starship prompt)
+#   - Links Neovim config
+#   - Points iTerm2 to load prefs from dotfiles
+#
+# What it does NOT do:
+#   - No macOS system defaults (defaults.sh)
+#   - No mackup / iCloud sync
+#   - No envy, work-tracker, or custom scripts
+#   - No podman, go, rust, yarn, or fullstack tools
+#   - No Slack, Chrome, Obsidian (your company installs those)
+#
+# Usage:
+#   git clone git@github.com:maxflorentin/dotfiles-mbairm4.git ~/.dotfiles
+#   ~/.dotfiles/install-corporate
+
+set -e
+
+DOTFILES="$(cd "$(dirname "$0")" && pwd)"
+
+echo "dotfiles install (corporate)"
+echo "  from: $DOTFILES"
+echo ""
+
+# --- Xcode CLI tools ---
+if ! xcode-select -p &>/dev/null; then
+    echo "  xcode: installing CLI tools..."
+    xcode-select --install
+    echo "  xcode: waiting for install to finish, re-run this script after"
+    exit 0
+fi
+
+# --- Homebrew ---
+if ! command -v brew &>/dev/null; then
+    echo "  brew: installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
+echo "  brew: installing packages (Brewfile.corporate)..."
+brew bundle --file="$DOTFILES/macos/Brewfile.corporate" --no-lock
+echo ""
+
+# --- Shell ---
+ln -sfn "$DOTFILES/shell/zshrc" "$HOME/.zshrc"
+echo "  shell: linked zshrc"
+
+# --- Git global ignore ---
+ln -sfn "$DOTFILES/.gitignore_global" "$HOME/.gitignore_global"
+git config --global core.excludesfile "$HOME/.gitignore_global"
+echo "  git: global ignore linked"
+
+# --- Neovim ---
+mkdir -p "$HOME/.config"
+if [ -L "$HOME/.config/nvim" ] || [ ! -d "$HOME/.config/nvim" ]; then
+    ln -sfn "$DOTFILES/editors/nvim" "$HOME/.config/nvim"
+    echo "  nvim: linked"
+else
+    echo "  nvim: WARNING — ~/.config/nvim exists (not a symlink)"
+    echo "        back it up: mv ~/.config/nvim ~/.config/nvim.bak"
+fi
+
+# --- iTerm2 ---
+ITERM_PREFS_DIR="$DOTFILES/editors/iterm2"
+if [ -f "$ITERM_PREFS_DIR/com.googlecode.iterm2.plist" ]; then
+    defaults write com.googlecode.iterm2 PrefsCustomFolder -string "$ITERM_PREFS_DIR"
+    defaults write com.googlecode.iterm2 LoadPrefsFromCustomFolder -bool true
+    echo "  iterm2: prefs loaded from dotfiles (restart iTerm2)"
+fi
+
+echo ""
+echo "Done. Reload shell: exec zsh"
+echo ""
+echo "You now have:"
+echo "  j <dir>      — jump to frecent directories (autojump)"
+echo "  vim          — neovim"
+echo "  gs/gb/gc/gl  — git shortcuts"
+echo "  asp          — AWS profile switcher (fzf)"
+echo "  k            — kubectl"
+echo "  bat/fzf/rg   — modern CLI tools"
