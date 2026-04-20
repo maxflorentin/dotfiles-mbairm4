@@ -1,28 +1,44 @@
 #!/bin/bash
 
-# tailscale-mutt-setup.sh: Set up a second Tailscale instance for MuttData
-# Run as admin (with sudo). One-time setup.
+# tailscale-mutt-setup.sh: Set up Tailscale instances for MuttData environments
+# Run as admin (with sudo). Idempotent — safe to re-run.
 #
-# Creates:
-#   - systemd service: tailscaled-mutt (port 41642, separate state)
-#   - sudoers drop-in: /etc/sudoers.d/tailscale-mutt
-#   - wrapper script:  /usr/local/bin/tailscale-mutt
+# Creates per-env:
+#   - systemd service: tailscaled-mutt-<env>
+#   - wrapper script:  /usr/local/bin/tailscale-mutt-<env>
+#   - sudoers drop-in: /etc/sudoers.d/tailscale-mutt (covers all envs)
 #
-# After setup, the mutt user can:
-#   tailscale-mutt up              # connect to mutt tailnet
-#   tailscale-mutt down            # disconnect
-#   tailscale-mutt status          # check connection
-#   tailscale-mutt start/stop      # manage the daemon
+# Usage:
+#   sudo ./tailscale-mutt-setup.sh <user> <env>
+#   sudo ./tailscale-mutt-setup.sh mutt dev
+#   sudo ./tailscale-mutt-setup.sh mutt stage
+#   sudo ./tailscale-mutt-setup.sh mutt prod
 #
-# Usage: sudo ./tailscale-mutt-setup.sh [username]
+# Then as mutt:
+#   tailscale-mutt-dev up --authkey=tskey-...
+#   tailscale-mutt-stage up --authkey=tskey-...
+#   tailscale-mutt-prod up --authkey=tskey-...
 
 set -e
 
-USER="${1:-mutt}"
-STATE_DIR="/var/lib/tailscale-mutt"
-SOCKET="/run/tailscale-mutt.sock"
-SERVICE="tailscaled-mutt"
-PORT=41642
+USER="${1:?Usage: $0 <user> <env>}"
+ENV="${2:?Usage: $0 <user> <env> (env: dev|stage|prod)}"
+
+# Port assignment per env
+case "$ENV" in
+    dev)   PORT=41642 ;;
+    stage) PORT=41643 ;;
+    prod)  PORT=41644 ;;
+    *)     echo "Error: env must be dev, stage, or prod"; exit 1 ;;
+esac
+
+STATE_DIR="/var/lib/tailscale-mutt-${ENV}"
+SOCKET="/run/tailscale-mutt-${ENV}.sock"
+SERVICE="tailscaled-mutt-${ENV}"
+WRAPPER="/usr/local/bin/tailscale-mutt-${ENV}"
+SUDOERS_FILE="/etc/sudoers.d/tailscale-mutt"
+TAILSCALE_BIN="$(command -v tailscale)"
+SYSTEMCTL_BIN="$(command -v systemctl)"
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "Error: run with sudo"
@@ -39,17 +55,18 @@ if ! command -v tailscaled &>/dev/null; then
     exit 1
 fi
 
-echo "Setting up Tailscale instance for user: $USER"
+echo "Setting up Tailscale instance: mutt-${ENV} (port ${PORT})"
+echo "  user: $USER"
 echo ""
 
 # --- State directory ---
 mkdir -p "$STATE_DIR"
-echo "  created: $STATE_DIR"
+echo "  state: $STATE_DIR"
 
 # --- systemd service ---
 cat > /etc/systemd/system/${SERVICE}.service <<EOF
 [Unit]
-Description=Tailscale (MuttData)
+Description=Tailscale (MuttData ${ENV})
 After=network-pre.target NetworkManager.service systemd-resolved.service
 Wants=network-pre.target
 
@@ -65,73 +82,69 @@ EOF
 
 systemctl daemon-reload
 systemctl enable --now "$SERVICE"
-echo "  service: $SERVICE enabled and started"
-
-# --- sudoers drop-in ---
-SUDOERS_FILE="/etc/sudoers.d/tailscale-mutt"
-TAILSCALE_BIN="$(command -v tailscale)"
-SYSTEMCTL_BIN="$(command -v systemctl)"
-
-cat > "$SUDOERS_FILE" <<EOF
-# Allow $USER to manage the tailscale-mutt instance (no password)
-$USER ALL=(ALL) NOPASSWD: ${TAILSCALE_BIN} --socket=${SOCKET} *
-$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} start ${SERVICE}
-$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} stop ${SERVICE}
-$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} restart ${SERVICE}
-$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} status ${SERVICE}
-EOF
-chmod 440 "$SUDOERS_FILE"
-# Validate sudoers syntax
-if ! visudo -cf "$SUDOERS_FILE" &>/dev/null; then
-    echo "  ERROR: sudoers syntax invalid, removing"
-    rm -f "$SUDOERS_FILE"
-    exit 1
-fi
-echo "  sudoers: $SUDOERS_FILE"
+echo "  service: $SERVICE (port $PORT)"
 
 # --- wrapper script ---
-cat > /usr/local/bin/tailscale-mutt <<'WRAPPER'
+cat > "$WRAPPER" <<EOF
 #!/bin/bash
-# Wrapper for the MuttData Tailscale instance
-SOCKET="/run/tailscale-mutt.sock"
-SERVICE="tailscaled-mutt"
+# Tailscale wrapper: MuttData ${ENV}
+SOCKET="${SOCKET}"
+SERVICE="${SERVICE}"
 
-case "$1" in
+case "\$1" in
     start|stop|restart|status-svc)
-        # Service management (status-svc to avoid collision with tailscale status)
-        cmd="$1"
-        [ "$cmd" = "status-svc" ] && cmd="status"
-        sudo systemctl "$cmd" "$SERVICE"
+        cmd="\$1"
+        [ "\$cmd" = "status-svc" ] && cmd="status"
+        sudo ${SYSTEMCTL_BIN} "\$cmd" "\$SERVICE"
         ;;
     "")
-        echo "Usage: tailscale-mutt <command>"
+        echo "Usage: tailscale-mutt-${ENV} <command>"
         echo ""
-        echo "Tailscale commands:"
-        echo "  up [--authkey=...]   Connect to MuttData tailnet"
+        echo "  up [--authkey=...]   Connect to MuttData ${ENV} tailnet"
         echo "  down                 Disconnect"
         echo "  status               Show connection status"
         echo "  ip                   Show Tailscale IP"
         echo "  ping <host>          Ping a tailnet host"
         echo ""
-        echo "Service commands:"
-        echo "  start                Start the daemon"
-        echo "  stop                 Stop the daemon"
-        echo "  restart              Restart the daemon"
-        echo "  status-svc           Show daemon service status"
+        echo "  start                Start daemon"
+        echo "  stop                 Stop daemon"
+        echo "  restart              Restart daemon"
+        echo "  status-svc           Daemon service status"
         ;;
     *)
-        sudo tailscale --socket="$SOCKET" "$@"
+        sudo ${TAILSCALE_BIN} --socket="\$SOCKET" "\$@"
         ;;
 esac
-WRAPPER
-chmod +x /usr/local/bin/tailscale-mutt
-echo "  wrapper: /usr/local/bin/tailscale-mutt"
+EOF
+chmod +x "$WRAPPER"
+echo "  wrapper: $WRAPPER"
+
+# --- sudoers drop-in (accumulates all envs) ---
+# Rebuild the sudoers file with entries for all existing mutt instances
+{
+    echo "# Allow $USER to manage tailscale-mutt instances (no password)"
+    echo "# Auto-generated by tailscale-mutt-setup.sh — do not edit manually"
+    for e in dev stage prod; do
+        svc="tailscaled-mutt-${e}"
+        sock="/run/tailscale-mutt-${e}.sock"
+        if [ -f "/etc/systemd/system/${svc}.service" ]; then
+            echo "$USER ALL=(ALL) NOPASSWD: ${TAILSCALE_BIN} --socket=${sock} *"
+            echo "$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} start ${svc}"
+            echo "$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} stop ${svc}"
+            echo "$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} restart ${svc}"
+            echo "$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} status ${svc}"
+        fi
+    done
+} > "$SUDOERS_FILE"
+chmod 440 "$SUDOERS_FILE"
+
+if ! visudo -cf "$SUDOERS_FILE" &>/dev/null; then
+    echo "  ERROR: sudoers syntax invalid, removing"
+    rm -f "$SUDOERS_FILE"
+    exit 1
+fi
+echo "  sudoers: $SUDOERS_FILE (updated for all envs)"
 
 echo ""
-echo "Done. Service is running."
-echo ""
-echo "Next: authenticate from user '$USER' (or here with the authkey):"
-echo "  tailscale-mutt up --authkey=tskey-..."
-echo ""
-echo "Or interactive (opens browser):"
-echo "  tailscale-mutt up"
+echo "Done. Connect as '$USER':"
+echo "  tailscale-mutt-${ENV} up --authkey=tskey-..."
