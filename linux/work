@@ -55,9 +55,9 @@ cmd_connect() {
     _validate_client_name "$client"
     work-tracker start "$client" "$project" "mac" 2>/dev/null || true
     if [ -n "$project" ]; then
-        _ssh_as_tty "$client" "tmux-layout '$project'"
+        _ssh_as_tty "$client" "~/.dotfiles/linux/tmux-layout '$project'"
     else
-        _ssh_as_tty "$client" "tmux-layout"
+        _ssh_as_tty "$client" "~/.dotfiles/linux/tmux-layout"
     fi
     work-tracker stop "$client" "$project" "mac" 2>/dev/null || true
 }
