@@ -71,10 +71,14 @@ After=network-pre.target NetworkManager.service systemd-resolved.service
 Wants=network-pre.target
 
 [Service]
-ExecStartPre=/usr/sbin/tailscaled --cleanup --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET}
+# No ExecStartPre cleanup — causes TPM contention with primary tailscaled
 ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT}
-ExecStopPost=/usr/sbin/tailscaled --cleanup --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET}
 Restart=on-failure
+# Block TPM access to avoid /dev/tpmrm0 contention (state stored unencrypted)
+DevicePolicy=closed
+DeviceAllow=/dev/net/tun rw
+DeviceAllow=/dev/null rw
+DeviceAllow=/dev/urandom r
 
 [Install]
 WantedBy=multi-user.target
