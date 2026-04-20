@@ -69,6 +69,18 @@ if [ "$OS" = "Linux" ]; then
     # tmux
     ln -sfn "$DOTFILES/linux/tmux.conf" "$HOME/.tmux.conf"
 
+    # tmux: TPM (plugin manager)
+    if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
+        git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
+        echo "  linux: tpm installed (run prefix+I inside tmux to install plugins)"
+    fi
+
+    # tmux: snazzy theme
+    if [ ! -f "$HOME/.tmux.snazzy.theme" ]; then
+        curl -sL https://raw.githubusercontent.com/ivnvxd/tmux-snazzy/main/.tmux.snazzy.theme -o "$HOME/.tmux.snazzy.theme"
+        echo "  linux: snazzy theme downloaded"
+    fi
+
     # fastfetch (used by `work status`)
     mkdir -p "$HOME/.config/fastfetch"
     ln -sfn "$DOTFILES/linux/fastfetch.jsonc" "$HOME/.config/fastfetch/config.jsonc"
