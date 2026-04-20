@@ -72,7 +72,7 @@ Wants=network-pre.target
 
 [Service]
 # No ExecStartPre cleanup — causes TPM contention with primary tailscaled
-ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT}
+ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT} --tun=ts-mutt-${ENV}
 Restart=on-failure
 # Block TPM access to avoid /dev/tpmrm0 contention (state stored unencrypted)
 DevicePolicy=closed
