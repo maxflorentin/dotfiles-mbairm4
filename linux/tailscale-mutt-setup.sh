@@ -1,41 +1,40 @@
 #!/bin/bash
 
-# tailscale-mutt-setup.sh: Set up Tailscale instances for MuttData environments
+# tailscale-mutt-setup.sh: Set up a secondary Tailscale instance for work VPN
 # Run as admin (with sudo). Idempotent — safe to re-run.
 #
-# Creates per-env:
-#   - systemd service: tailscaled-mutt-<env>
-#   - wrapper script:  /usr/local/bin/tailscale-mutt-<env>
-#   - sudoers drop-in: /etc/sudoers.d/tailscale-mutt (covers all envs)
+# Creates:
+#   - systemd service: tailscaled-mutt
+#   - wrapper script:  /usr/local/bin/tailscale-mutt
+#   - sudoers drop-in: /etc/sudoers.d/tailscale-mutt
+#
+# The secondary instance uses:
+#   - Separate TUN device (ts-mutt), socket, state dir, port
+#   - netfilter-mode=off to avoid routing conflicts with primary tailscale
+#   - DevicePolicy=closed to avoid TPM contention
 #
 # Usage:
-#   sudo ./tailscale-mutt-setup.sh <user> <env>
-#   sudo ./tailscale-mutt-setup.sh mutt dev
-#   sudo ./tailscale-mutt-setup.sh mutt stage
-#   sudo ./tailscale-mutt-setup.sh mutt prod
+#   sudo ./tailscale-mutt-setup.sh <user>
+#   sudo ./tailscale-mutt-setup.sh mutt
 #
-# Then as mutt:
-#   tailscale-mutt-dev up --authkey=tskey-...
-#   tailscale-mutt-stage up --authkey=tskey-...
-#   tailscale-mutt-prod up --authkey=tskey-...
+# Then as the user:
+#   tailscale-mutt up --authkey=tskey-auth-...
+#   tailscale-mutt status
+#   tailscale-mutt down
+#
+# See: docs/ecryptfs.md (for encrypted home setup)
+#      docs/tailscale-mutt.md (for this setup)
 
 set -e
 
-USER="${1:?Usage: $0 <user> <env>}"
-ENV="${2:?Usage: $0 <user> <env> (env: dev|stage|prod)}"
+USER="${1:?Usage: $0 <user>}"
 
-# Port assignment per env
-case "$ENV" in
-    dev)   PORT=41642 ;;
-    stage) PORT=41643 ;;
-    prod)  PORT=41644 ;;
-    *)     echo "Error: env must be dev, stage, or prod"; exit 1 ;;
-esac
-
-STATE_DIR="/var/lib/tailscale-mutt-${ENV}"
-SOCKET="/run/tailscale-mutt-${ENV}.sock"
-SERVICE="tailscaled-mutt-${ENV}"
-WRAPPER="/usr/local/bin/tailscale-mutt-${ENV}"
+STATE_DIR="/var/lib/tailscale-mutt"
+SOCKET="/run/tailscale-mutt.sock"
+SERVICE="tailscaled-mutt"
+PORT=41642
+TUN="ts-mutt"
+WRAPPER="/usr/local/bin/tailscale-mutt"
 SUDOERS_FILE="/etc/sudoers.d/tailscale-mutt"
 TAILSCALE_BIN="$(command -v tailscale)"
 SYSTEMCTL_BIN="$(command -v systemctl)"
@@ -55,26 +54,47 @@ if ! command -v tailscaled &>/dev/null; then
     exit 1
 fi
 
-echo "Setting up Tailscale instance: mutt-${ENV} (port ${PORT})"
+echo "Setting up secondary Tailscale instance"
 echo "  user: $USER"
+echo "  port: $PORT"
+echo "  tun:  $TUN"
 echo ""
+
+# --- Clean up old per-env services if they exist ---
+for env in dev stage prod; do
+    old_svc="tailscaled-mutt-${env}"
+    if systemctl is-active --quiet "$old_svc" 2>/dev/null; then
+        systemctl stop "$old_svc"
+        systemctl disable "$old_svc"
+        rm -f "/etc/systemd/system/${old_svc}.service"
+        rm -f "/usr/local/bin/tailscale-mutt-${env}"
+        rm -rf "/var/lib/tailscale-mutt-${env}"
+        echo "  cleanup: removed old $old_svc"
+    elif [ -f "/etc/systemd/system/${old_svc}.service" ]; then
+        rm -f "/etc/systemd/system/${old_svc}.service"
+        rm -f "/usr/local/bin/tailscale-mutt-${env}"
+        rm -rf "/var/lib/tailscale-mutt-${env}"
+        echo "  cleanup: removed old $old_svc (was inactive)"
+    fi
+done
 
 # --- State directory ---
 mkdir -p "$STATE_DIR"
-echo "  state: $STATE_DIR"
 
 # --- systemd service ---
 cat > /etc/systemd/system/${SERVICE}.service <<EOF
 [Unit]
-Description=Tailscale (MuttData ${ENV})
-After=network-pre.target NetworkManager.service systemd-resolved.service
+Description=Tailscale (secondary - work VPN)
+After=network-pre.target NetworkManager.service systemd-resolved.service tailscaled.service
 Wants=network-pre.target
+# Start after primary tailscale to avoid conflicts
+Requires=tailscaled.service
 
 [Service]
-# No ExecStartPre cleanup — causes TPM contention with primary tailscaled
-ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT} --tun=ts-mutt-${ENV}
+ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT} --tun=${TUN} --netfilter-mode=off
 Restart=on-failure
-# Block TPM access to avoid /dev/tpmrm0 contention (state stored unencrypted)
+RestartSec=5
+# Block TPM access to avoid contention with primary tailscaled
 DevicePolicy=closed
 DeviceAllow=/dev/net/tun rw
 DeviceAllow=/dev/null rw
@@ -86,25 +106,24 @@ EOF
 
 systemctl daemon-reload
 systemctl enable --now "$SERVICE"
-echo "  service: $SERVICE (port $PORT)"
+echo "  service: $SERVICE"
 
 # --- wrapper script ---
 cat > "$WRAPPER" <<EOF
 #!/bin/bash
-# Tailscale wrapper: MuttData ${ENV}
+# Tailscale wrapper: secondary work VPN instance
+# See: docs/tailscale-mutt.md
 SOCKET="${SOCKET}"
 SERVICE="${SERVICE}"
 
 case "\$1" in
-    start|stop|restart|status-svc)
-        cmd="\$1"
-        [ "\$cmd" = "status-svc" ] && cmd="status"
-        sudo ${SYSTEMCTL_BIN} "\$cmd" "\$SERVICE"
+    start|stop|restart)
+        sudo ${SYSTEMCTL_BIN} "\$1" "\$SERVICE"
         ;;
     "")
-        echo "Usage: tailscale-mutt-${ENV} <command>"
+        echo "Usage: tailscale-mutt <command>"
         echo ""
-        echo "  up [--authkey=...]   Connect to MuttData ${ENV} tailnet"
+        echo "  up [--authkey=...]   Connect to work tailnet"
         echo "  down                 Disconnect"
         echo "  status               Show connection status"
         echo "  ip                   Show Tailscale IP"
@@ -113,7 +132,6 @@ case "\$1" in
         echo "  start                Start daemon"
         echo "  stop                 Stop daemon"
         echo "  restart              Restart daemon"
-        echo "  status-svc           Daemon service status"
         ;;
     *)
         sudo ${TAILSCALE_BIN} --socket="\$SOCKET" "\$@"
@@ -123,23 +141,16 @@ EOF
 chmod +x "$WRAPPER"
 echo "  wrapper: $WRAPPER"
 
-# --- sudoers drop-in (accumulates all envs) ---
-# Rebuild the sudoers file with entries for all existing mutt instances
-{
-    echo "# Allow $USER to manage tailscale-mutt instances (no password)"
-    echo "# Auto-generated by tailscale-mutt-setup.sh — do not edit manually"
-    for e in dev stage prod; do
-        svc="tailscaled-mutt-${e}"
-        sock="/run/tailscale-mutt-${e}.sock"
-        if [ -f "/etc/systemd/system/${svc}.service" ]; then
-            echo "$USER ALL=(ALL) NOPASSWD: ${TAILSCALE_BIN} --socket=${sock} *"
-            echo "$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} start ${svc}"
-            echo "$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} stop ${svc}"
-            echo "$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} restart ${svc}"
-            echo "$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} status ${svc}"
-        fi
-    done
-} > "$SUDOERS_FILE"
+# --- sudoers drop-in ---
+cat > "$SUDOERS_FILE" <<EOF
+# Allow $USER to manage the secondary tailscale instance (no password)
+# Auto-generated by tailscale-mutt-setup.sh — do not edit manually
+$USER ALL=(ALL) NOPASSWD: ${TAILSCALE_BIN} --socket=${SOCKET} *
+$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} start ${SERVICE}
+$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} stop ${SERVICE}
+$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} restart ${SERVICE}
+$USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} status ${SERVICE}
+EOF
 chmod 440 "$SUDOERS_FILE"
 
 if ! visudo -cf "$SUDOERS_FILE" &>/dev/null; then
@@ -147,8 +158,11 @@ if ! visudo -cf "$SUDOERS_FILE" &>/dev/null; then
     rm -f "$SUDOERS_FILE"
     exit 1
 fi
-echo "  sudoers: $SUDOERS_FILE (updated for all envs)"
+echo "  sudoers: $SUDOERS_FILE"
 
 echo ""
 echo "Done. Connect as '$USER':"
-echo "  tailscale-mutt-${ENV} up --authkey=tskey-..."
+echo "  tailscale-mutt up --authkey=tskey-auth-..."
+echo ""
+echo "Verify personal tailscale is unaffected:"
+echo "  tailscale status"
