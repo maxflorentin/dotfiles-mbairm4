@@ -15,6 +15,9 @@ add_to_path "$DOTFILES/scripts"
 add_to_path "${NODE_BIN:-$HOME/.node/bin}"
 add_to_path "node_modules/.bin"
 
+# User-local npm global packages (for users without write access to /usr/local)
+add_to_path "$HOME/.npm-global/bin"
+
 # Antigravity
 add_to_path "${ANTIGRAVITY_BIN:-$HOME/.antigravity/antigravity/bin}"
 
