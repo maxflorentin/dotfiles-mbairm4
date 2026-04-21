@@ -53,6 +53,12 @@ cmd_connect() {
     fi
 
     _validate_client_name "$client"
+
+    # Mount ecryptfs home if encrypted and not already mounted.
+    # Passphrase stored in /etc/ecryptfs/<client>.passphrase (root-only, 600).
+    # See: docs/ecryptfs.md
+    _ssh_quiet "sudo /usr/local/sbin/ecryptfs-auto-mount '$client'" || true
+
     work-tracker start "$client" "$project" "mac" 2>/dev/null || true
     if [ -n "$project" ]; then
         _ssh_as_tty "$client" "~/.dotfiles/linux/tmux-layout '$project'"

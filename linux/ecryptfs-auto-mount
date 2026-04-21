@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# ecryptfs-auto-mount: Mount ecryptfs home for a client user
+# Intended to run as root via sudoers (no password prompt).
+# Called by `work connect` before SSH-ing as the client user.
+#
+# Passphrase file: /etc/ecryptfs/<user>.passphrase (mode 600, root-only)
+# See: docs/ecryptfs.md
+#
+# Usage: ecryptfs-auto-mount <username>
+
+set -e
+
+USER="$1"
+
+if [ -z "$USER" ]; then
+    echo "Usage: ecryptfs-auto-mount <username>" >&2
+    exit 1
+fi
+
+# Skip if not an ecryptfs user
+ECRYPTFS_DIR="/home/.ecryptfs/$USER"
+if [ ! -d "$ECRYPTFS_DIR" ]; then
+    exit 0
+fi
+
+# Skip if already mounted
+if mount | grep -q "on /home/$USER " 2>/dev/null; then
+    exit 0
+fi
+
+# Read passphrase
+PASSPHRASE_FILE="/etc/ecryptfs/${USER}.passphrase"
+if [ ! -f "$PASSPHRASE_FILE" ]; then
+    echo "Error: passphrase file not found: $PASSPHRASE_FILE" >&2
+    echo "Create it: echo 'passphrase' | sudo tee $PASSPHRASE_FILE && sudo chmod 600 $PASSPHRASE_FILE" >&2
+    exit 1
+fi
+
+PASSPHRASE="$(cat "$PASSPHRASE_FILE")"
+WRAPPED_PASSPHRASE="$ECRYPTFS_DIR/.ecryptfs/wrapped-passphrase"
+MOUNT_PASSPHRASE="$(printf '%s' "$PASSPHRASE" | ecryptfs-unwrap-passphrase "$WRAPPED_PASSPHRASE" -)"
+
+# Insert passphrase into kernel keyring and mount
+SIG="$(head -1 "$ECRYPTFS_DIR/.ecryptfs/Private.sig")"
+FSIG="$(tail -1 "$ECRYPTFS_DIR/.ecryptfs/Private.sig")"
+
+printf '%s' "$MOUNT_PASSPHRASE" | ecryptfs-add-passphrase --fnek -
+
+mount -t ecryptfs \
+    "$ECRYPTFS_DIR/.Private" \
+    "/home/$USER" \
+    -o "key=passphrase:passphrase_passwd=$MOUNT_PASSPHRASE,ecryptfs_cipher=aes,ecryptfs_key_bytes=16,ecryptfs_passthrough=n,ecryptfs_enable_filename_crypto=y,ecryptfs_sig=$SIG,ecryptfs_fnek_sig=$FSIG,no_sig_cache"
