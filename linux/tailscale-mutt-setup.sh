@@ -91,12 +91,11 @@ Wants=network-pre.target
 Requires=tailscaled.service
 
 [Service]
-ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT} --tun=${TUN} --netfilter-mode=off
+ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT} --tun=userspace-networking
 Restart=on-failure
 RestartSec=5
 # Block TPM access to avoid contention with primary tailscaled
 DevicePolicy=closed
-DeviceAllow=/dev/net/tun rw
 DeviceAllow=/dev/null rw
 DeviceAllow=/dev/urandom r
 
