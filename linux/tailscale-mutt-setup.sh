@@ -98,6 +98,7 @@ RestartSec=5
 DevicePolicy=closed
 DeviceAllow=/dev/null rw
 DeviceAllow=/dev/urandom r
+DeviceAllow=char-tun rw
 
 [Install]
 WantedBy=multi-user.target
