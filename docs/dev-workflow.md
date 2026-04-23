@@ -31,11 +31,11 @@ Pi workstation (100.88.210.35)          Mac (Tailscale IP)
 
 ### Option 1: VSCode + Remote SSH (for editing on Pi)
 
-Connect to the Pi via `ws-mutt-vscode` (after mounting ecryptfs).
+Connect via `ws-<client>-vscode` (after mounting ecryptfs).
 
 **Workflow:**
-1. Terminal: `ssh ws-mutt` → enter password (mounts ecryptfs home)
-2. VSCode: Remote Explorer → `ws-mutt-vscode` → connects with key auth
+1. Terminal: `ssh ws-<client>` → enter password (mounts ecryptfs home)
+2. VSCode: Remote Explorer → `ws-<client>-vscode` → connects with key auth
 
 **Recommended VSCode settings** (remote, to reduce Pi resource usage):
 
@@ -163,7 +163,7 @@ Instead: run Docker on the Mac, access services from the Pi via Tailscale.
 
 ```bash
 # On Mac — run your stack
-cd ~/projects/mixilo-data
+cd ~/projects/<project-name>
 docker compose up -d
 
 # From Pi — access the services
@@ -210,7 +210,7 @@ tailscale status
 
 # SSH to Pi works
 ssh workstation
-ssh ws-mutt          # password → ecryptfs
+ssh ws-<client>      # password → ecryptfs (if encrypted home)
 
 # Claude Code on Pi
 ssh workstation

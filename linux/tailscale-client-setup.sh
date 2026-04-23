@@ -1,41 +1,39 @@
 #!/bin/bash
 
-# tailscale-mutt-setup.sh: Set up a secondary Tailscale instance for work VPN
+# tailscale-client-setup.sh: Set up a secondary Tailscale instance for a client user
 # Run as admin (with sudo). Idempotent — safe to re-run.
 #
-# Creates:
-#   - systemd service: tailscaled-mutt
-#   - wrapper script:  /usr/local/bin/tailscale-mutt
-#   - sudoers drop-in: /etc/sudoers.d/tailscale-mutt
+# Creates (all derived from $USER, nothing hardcoded):
+#   - systemd service: tailscaled-<user>
+#   - wrapper script:  /usr/local/bin/tailscale-<user>
+#   - sudoers drop-in: /etc/sudoers.d/tailscale-<user>
 #
 # The secondary instance uses:
-#   - Separate TUN device (ts-mutt), socket, state dir, port
-#   - netfilter-mode=off to avoid routing conflicts with primary tailscale
-#   - DevicePolicy=closed to avoid TPM contention
+#   - userspace-networking (no TUN device, no iptables, no routing conflicts)
+#   - Separate socket, state dir, port
 #
 # Usage:
-#   sudo ./tailscale-mutt-setup.sh <user>
-#   sudo ./tailscale-mutt-setup.sh mutt
+#   sudo ./tailscale-client-setup.sh <user>
 #
-# Then as the user:
-#   tailscale-mutt up --authkey=tskey-auth-...
-#   tailscale-mutt status
-#   tailscale-mutt down
+# Then as the client user:
+#   tailscale-<user> up --authkey=tskey-auth-...
+#   tailscale-<user> status
+#   tailscale-<user> down
 #
-# See: docs/ecryptfs.md (for encrypted home setup)
-#      docs/tailscale-mutt.md (for this setup)
+# Client-specific config (tailnet, auth keys) belongs in ~/.clientrc, not here.
+# See: docs/tailscale-client.md
 
 set -e
 
 USER="${1:?Usage: $0 <user>}"
 
-STATE_DIR="/var/lib/tailscale-mutt"
-SOCKET="/run/tailscale-mutt.sock"
-SERVICE="tailscaled-mutt"
+STATE_DIR="/var/lib/tailscale-${USER}"
+SOCKET="/run/tailscale-${USER}.sock"
+SERVICE="tailscaled-${USER}"
 PORT=41642
 TUN="userspace-networking"
-WRAPPER="/usr/local/bin/tailscale-mutt"
-SUDOERS_FILE="/etc/sudoers.d/tailscale-mutt"
+WRAPPER="/usr/local/bin/tailscale-${USER}"
+SUDOERS_FILE="/etc/sudoers.d/tailscale-${USER}"
 TAILSCALE_BIN="$(command -v tailscale)"
 SYSTEMCTL_BIN="$(command -v systemctl)"
 
@@ -57,26 +55,7 @@ fi
 echo "Setting up secondary Tailscale instance"
 echo "  user: $USER"
 echo "  port: $PORT"
-echo "  tun:  $TUN"
 echo ""
-
-# --- Clean up old per-env services if they exist ---
-for env in dev stage prod; do
-    old_svc="tailscaled-mutt-${env}"
-    if systemctl is-active --quiet "$old_svc" 2>/dev/null; then
-        systemctl stop "$old_svc"
-        systemctl disable "$old_svc"
-        rm -f "/etc/systemd/system/${old_svc}.service"
-        rm -f "/usr/local/bin/tailscale-mutt-${env}"
-        rm -rf "/var/lib/tailscale-mutt-${env}"
-        echo "  cleanup: removed old $old_svc"
-    elif [ -f "/etc/systemd/system/${old_svc}.service" ]; then
-        rm -f "/etc/systemd/system/${old_svc}.service"
-        rm -f "/usr/local/bin/tailscale-mutt-${env}"
-        rm -rf "/var/lib/tailscale-mutt-${env}"
-        echo "  cleanup: removed old $old_svc (was inactive)"
-    fi
-done
 
 # --- State directory ---
 mkdir -p "$STATE_DIR"
@@ -84,17 +63,15 @@ mkdir -p "$STATE_DIR"
 # --- systemd service ---
 cat > /etc/systemd/system/${SERVICE}.service <<EOF
 [Unit]
-Description=Tailscale (secondary - work VPN)
+Description=Tailscale (secondary - ${USER})
 After=network-pre.target NetworkManager.service systemd-resolved.service tailscaled.service
 Wants=network-pre.target
-# Start after primary tailscale to avoid conflicts
 Requires=tailscaled.service
 
 [Service]
 ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT} --tun=${TUN}
 Restart=on-failure
 RestartSec=5
-# TPM errors are handled gracefully by tailscaled internally (no DevicePolicy needed)
 
 [Install]
 WantedBy=multi-user.target
@@ -107,8 +84,8 @@ echo "  service: $SERVICE"
 # --- wrapper script ---
 cat > "$WRAPPER" <<EOF
 #!/bin/bash
-# Tailscale wrapper: secondary work VPN instance
-# See: docs/tailscale-mutt.md
+# Tailscale wrapper: secondary instance for ${USER}
+# See: docs/tailscale-client.md
 SOCKET="${SOCKET}"
 SERVICE="${SERVICE}"
 
@@ -117,7 +94,7 @@ case "\$1" in
         sudo ${SYSTEMCTL_BIN} "\$1" "\$SERVICE"
         ;;
     "")
-        echo "Usage: tailscale-mutt <command>"
+        echo "Usage: tailscale-${USER} <command>"
         echo ""
         echo "  up [--authkey=...]   Connect to work tailnet"
         echo "  down                 Disconnect"
@@ -133,9 +110,9 @@ case "\$1" in
         # Block --accept-routes: importing work routes kills personal tailscale routing
         for arg in "\$@"; do
             if [ "\$arg" = "--accept-routes" ] || [ "\$arg" = "--accept-routes=true" ]; then
-                echo "ERROR: --accept-routes is blocked on the secondary instance."
-                echo "It imports work subnet routes that conflict with personal tailscale."
-                echo "Access work hosts directly by their Tailscale IPs (100.x.x.x) instead."
+                echo "ERROR: --accept-routes is blocked on secondary instances."
+                echo "It imports subnet routes that conflict with personal tailscale."
+                echo "Access work hosts directly by their Tailscale IPs (100.x.x.x)."
                 exit 1
             fi
         done
@@ -148,8 +125,8 @@ echo "  wrapper: $WRAPPER"
 
 # --- sudoers drop-in ---
 cat > "$SUDOERS_FILE" <<EOF
-# Allow $USER to manage the secondary tailscale instance (no password)
-# Auto-generated by tailscale-mutt-setup.sh — do not edit manually
+# Allow $USER to manage their secondary tailscale instance (no password)
+# Auto-generated by tailscale-client-setup.sh — do not edit manually
 $USER ALL=(ALL) NOPASSWD: ${TAILSCALE_BIN} --socket=${SOCKET} *
 $USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} start ${SERVICE}
 $USER ALL=(ALL) NOPASSWD: ${SYSTEMCTL_BIN} stop ${SERVICE}
@@ -171,7 +148,7 @@ echo "  operator: $USER"
 
 echo ""
 echo "Done. Connect as '$USER':"
-echo "  tailscale-mutt up --authkey=tskey-auth-..."
+echo "  tailscale-${USER} up --authkey=tskey-auth-..."
 echo ""
 echo "Verify personal tailscale is unaffected:"
 echo "  tailscale status"

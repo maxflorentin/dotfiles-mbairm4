@@ -4,7 +4,7 @@
 # Usage: work <command> [args]
 #
 # Architecture:
-#   - One Linux user on the Pi per client (e.g. /home/mutt, /home/lahuen)
+#   - One Linux user per client (e.g. /home/<client>)
 #   - Admin user (max) owns /etc, shared VPN configs, compliance tooling
 #   - Each client user has their own dotfiles clone, venv, envy, work-tracker log
 #   - This CLI runs on Mac and SSHes as the appropriate user per command

@@ -206,19 +206,14 @@ Host workstation
     HostName 100.102.172.111
     User max
 
-Host ws-mutt
+Host ws-<client>
     HostName 100.102.172.111
-    User mutt
-    PreferredAuthentications password
-    PubkeyAuthentication no
-    LocalForward 8080 localhost:8080
-    LocalForward 8888 localhost:8888
-    LocalForward 5000 localhost:5000
-    LocalForward 3000 localhost:3000
+    User <client>
+    # Add LocalForward as needed per client (ports in ~/.clientrc)
 
-Host ws-lahuen
-    HostName 100.102.172.111
-    User lahuen
+# For ecryptfs clients, add:
+#   PreferredAuthentications password
+#   PubkeyAuthentication no
 
 # Emergency LAN fallback
 Host ws-lan
@@ -233,8 +228,7 @@ Create one profile per client user:
 | Profile | Host | User | Auth |
 |---------|------|------|------|
 | workstation | 100.102.172.111 | max | SSH key |
-| ws-mutt | 100.102.172.111 | mutt | Password (ecryptfs auto-mount) |
-| ws-lahuen | 100.102.172.111 | lahuen | SSH key |
+| ws-&lt;client&gt; | 100.102.172.111 | &lt;client&gt; | SSH key (or password if ecryptfs) |
 
 Tailscale must be active (VPN toggle on) before connecting.
 
@@ -243,12 +237,12 @@ Tailscale must be active (VPN toggle on) before connecting.
 Clients with encrypted homes need password auth on first login so ecryptfs can mount. This is handled server-side in `/etc/ssh/sshd_config`:
 
 ```
-Match User mutt
+Match User <client>
     AuthenticationMethods password
     PasswordAuthentication yes
 ```
 
-After the first SSH login decrypts the home, key-based auth also works (keys are in `/etc/ssh/authorized_keys/%u`).
+After the first SSH login decrypts the home, key-based auth also works (keys are in `/etc/ssh/authorized_keys/%u`). Client names configured in sshd_config live on the server, not in this repo.
 
 ---
 
@@ -263,7 +257,7 @@ tailscale status                     # from any node
 
 # 2. SSH works via Tailscale IP
 ssh workstation                   # key auth, admin user
-ssh ws-mutt                          # password auth → ecryptfs mounts
+ssh ws-<client>                      # per-client host from ~/.ssh/config.d/
 
 # 3. From iPhone
 # Tailscale VPN on → open terminal app → ssh max@100.102.172.111
