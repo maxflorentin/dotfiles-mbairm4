@@ -94,11 +94,7 @@ Requires=tailscaled.service
 ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT} --tun=${TUN}
 Restart=on-failure
 RestartSec=5
-# Block TPM access to avoid contention with primary tailscaled
-DevicePolicy=closed
-DeviceAllow=/dev/null rw
-DeviceAllow=/dev/urandom r
-DeviceAllow=char-tun rw
+# TPM errors are handled gracefully by tailscaled internally (no DevicePolicy needed)
 
 [Install]
 WantedBy=multi-user.target

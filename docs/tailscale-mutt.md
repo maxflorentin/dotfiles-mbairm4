@@ -10,7 +10,7 @@ Key design decisions:
 - `--netfilter-mode=off` was the intended isolation flag but was removed in tailscaled ≥1.96 — separation relies solely on distinct TUN devices now
 - `--tun=ts-mutt` avoids TUN device name collision (primary uses `tailscale0`)
 - Real TUN device (not `userspace-networking`) is required for subnet routing — userspace mode does not install kernel routes, so `ip route` won't have VPC subnets and kubectl/curl won't reach them
-- `DevicePolicy=closed` in systemd avoids TPM contention (`/dev/tpmrm0`)
+- No `DevicePolicy` needed — tailscaled ≥1.96 handles TPM errors gracefully without crashing
 - Single instance (not per-env) — connect/disconnect as needed
 - Client user runs commands via sudoers (no full sudo)
 
