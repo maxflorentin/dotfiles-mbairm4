@@ -130,6 +130,15 @@ case "\$1" in
         echo "  restart              Restart daemon"
         ;;
     *)
+        # Block --accept-routes: importing work routes kills personal tailscale routing
+        for arg in "\$@"; do
+            if [ "\$arg" = "--accept-routes" ] || [ "\$arg" = "--accept-routes=true" ]; then
+                echo "ERROR: --accept-routes is blocked on the secondary instance."
+                echo "It imports work subnet routes that conflict with personal tailscale."
+                echo "Access work hosts directly by their Tailscale IPs (100.x.x.x) instead."
+                exit 1
+            fi
+        done
         sudo ${TAILSCALE_BIN} --socket="\$SOCKET" "\$@"
         ;;
 esac

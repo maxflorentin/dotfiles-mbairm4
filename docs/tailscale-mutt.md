@@ -7,10 +7,9 @@ to a work tailnet. Uses separate TUN device, socket, port, and state
 to avoid conflicts.
 
 Key design decisions:
-- `--netfilter-mode=off` was the intended isolation flag but was removed in tailscaled ≥1.96 — separation relies solely on distinct TUN devices now
-- `--tun=ts-mutt` avoids TUN device name collision (primary uses `tailscale0`)
-- Real TUN device (not `userspace-networking`) is required for subnet routing — userspace mode does not install kernel routes, so `ip route` won't have VPC subnets and kubectl/curl won't reach them
-- No `DevicePolicy` needed — tailscaled ≥1.96 handles TPM errors gracefully without crashing
+- `--tun=userspace-networking` avoids TUN/iptables/routing conflicts entirely
+- `--accept-routes` is BLOCKED in the wrapper (causes routing conflicts that kill personal tailscale)
+- No `DevicePolicy` needed — tailscaled >=1.96 handles TPM errors gracefully
 - Single instance (not per-env) — connect/disconnect as needed
 - Client user runs commands via sudoers (no full sudo)
 
@@ -20,9 +19,9 @@ Key design decisions:
 tailscaled (personal)          tailscaled-mutt (work)
 ├── socket: /run/tailscale     ├── socket: /run/tailscale-mutt.sock
 ├── port: 41641                ├── port: 41642
-├── tun: tailscale0            ├── tun: ts-mutt
+├── tun: tailscale0            ├── tun: userspace-networking
 ├── state: /var/lib/tailscale  ├── state: /var/lib/tailscale-mutt
-└── netfilter: on              └── netfilter: off
+└── netfilter: on              └── netfilter: n/a (userspace)
 ```
 
 ## Setup (one-time, as admin)
@@ -64,21 +63,21 @@ tailscale-mutt restart   # restart
 
 ## Troubleshooting
 
-### Personal tailscale lost connectivity after `up`
-The `--netfilter-mode=off` flag should prevent this. If it still happens:
-1. `tailscale-mutt down` (disconnect work VPN)
-2. `sudo systemctl restart tailscaled` (restart personal)
-3. Check `tailscale status` to confirm personal is back
+### NEVER use --accept-routes
+`--accept-routes` imports subnet routes from the work tailnet that
+overwrite personal tailscale routing, causing total loss of SSH access.
+The wrapper script blocks this flag. Access work hosts by their
+Tailscale IPs (100.x.x.x) directly — no routes needed.
 
-### "device or resource busy" on startup
-Another instance is using the TUN device. Check:
-`ip link show ts-mutt` — if it exists from a crashed instance:
-`sudo ip link delete ts-mutt`
+### Personal tailscale lost connectivity
+1. Connect via LAN: `ssh max@192.168.68.52`
+2. `sudo systemctl stop tailscaled-mutt`
+3. `sudo systemctl restart tailscaled`
+4. Verify: `tailscale status`
 
 ### Socket not found
 The daemon isn't running: `tailscale-mutt start`
 
-### TPM timeout on startup
-The `DevicePolicy=closed` in the systemd unit should prevent this.
-If it still occurs, check that the service file has the correct
-DevicePolicy/DeviceAllow directives.
+### Service won't start after reboot
+The service is disabled by default after the accept-routes incident.
+Re-enable: `sudo systemctl enable --now tailscaled-mutt`
