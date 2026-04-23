@@ -7,8 +7,9 @@ to a work tailnet. Uses separate TUN device, socket, port, and state
 to avoid conflicts.
 
 Key design decisions:
-- `--netfilter-mode=off` prevents iptables conflicts with primary tailscale
+- `--netfilter-mode=off` prevents iptables conflicts with primary tailscale (this is the key isolation — NOT userspace-networking)
 - `--tun=ts-mutt` avoids TUN device name collision (primary uses `tailscale0`)
+- Real TUN device (not `userspace-networking`) is required for subnet routing — userspace mode does not install kernel routes, so `ip route` won't have VPC subnets and kubectl/curl won't reach them
 - `DevicePolicy=closed` in systemd avoids TPM contention (`/dev/tpmrm0`)
 - Single instance (not per-env) — connect/disconnect as needed
 - Client user runs commands via sudoers (no full sudo)

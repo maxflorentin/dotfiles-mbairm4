@@ -91,7 +91,7 @@ Wants=network-pre.target
 Requires=tailscaled.service
 
 [Service]
-ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT} --tun=userspace-networking
+ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT} --tun=${TUN} --netfilter-mode=off
 Restart=on-failure
 RestartSec=5
 # Block TPM access to avoid contention with primary tailscaled
@@ -158,6 +158,10 @@ if ! visudo -cf "$SUDOERS_FILE" &>/dev/null; then
     exit 1
 fi
 echo "  sudoers: $SUDOERS_FILE"
+
+# --- Set operator so $USER can run tailscale up/down/set without sudo ---
+tailscale --socket="$SOCKET" set --operator="$USER" 2>/dev/null || true
+echo "  operator: $USER"
 
 echo ""
 echo "Done. Connect as '$USER':"
