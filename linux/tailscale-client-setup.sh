@@ -72,6 +72,10 @@ Requires=tailscaled.service
 ExecStart=/usr/sbin/tailscaled --state=${STATE_DIR}/tailscaled.state --socket=${SOCKET} --port=${PORT} --tun=${TUN}
 Restart=on-failure
 RestartSec=5
+# Prevent TPM contention with primary tailscaled (state saved unencrypted)
+DevicePolicy=closed
+DeviceAllow=/dev/null rw
+DeviceAllow=/dev/urandom r
 
 [Install]
 WantedBy=multi-user.target

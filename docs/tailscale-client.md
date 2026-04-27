@@ -11,8 +11,9 @@ is hardcoded. Client-specific config (tailnet, auth keys, hostnames)
 belongs in `~/.clientrc`, never in this repo.
 
 Key design decisions:
-- `--tun=userspace-networking` avoids all routing conflicts
-- `--accept-routes` is BLOCKED in the wrapper (causes routing conflicts that kill personal tailscale)
+- `--tun=userspace-networking` avoids TUN/nftables conflicts with primary tailscale (TUN real causes iptables rule collision on `up`, breaks personal routing and kills SSH)
+- `DevicePolicy=closed` in systemd prevents TPM contention with primary tailscaled (`/dev/tpmrm0`); state is saved unencrypted as a result
+- `--accept-routes` is BLOCKED in the wrapper (imports subnet routes that overwrite personal tailscale routing, causes total loss of SSH access)
 - Service/socket/wrapper names derived from `$USER` parameter
 - Single instance per client user — connect/disconnect as needed
 
